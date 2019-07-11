@@ -18,6 +18,7 @@
 #include "logging/Manager.h"
 #include "DebugLogger.h"
 #include "iosource/Manager.h"
+#include "SerializationFormat.h"
 
 using namespace std;
 
@@ -176,6 +177,15 @@ void Manager::InitPostScript()
 	options.use_real_time = ! reading_pcaps;
 
 	BrokerConfig config{std::move(options)};
+
+	auto scheduler_policy = get_option("Broker::scheduler_policy")->AsString()->CheckString();
+
+	if ( streq(scheduler_policy, "sharing") )
+		config.set("scheduler.policy", caf::atom("sharing"));
+	else if ( streq(scheduler_policy, "stealing") )
+		config.set("scheduler.policy", caf::atom("stealing"));
+	else
+		reporter->FatalError("Invalid Broker::scheduler_policy: %s", scheduler_policy);
 
 	auto max_threads_env = zeekenv("ZEEK_BROKER_MAX_THREADS");
 
@@ -772,6 +782,15 @@ bool Manager::Subscribe(const string& topic_prefix)
 	{
 	DBG_LOG(DBG_BROKER, "Subscribing to topic prefix %s", topic_prefix.c_str());
 	bstate->subscriber.add_topic(topic_prefix, ! after_zeek_init);
+
+	// For backward compatibility, we also may receive messages on
+	// "bro/" topic prefixes in addition to "zeek/".
+	if ( strncmp(topic_prefix.data(), "zeek/", 5) == 0 )
+		{
+		std::string alt_topic = "bro/" + topic_prefix.substr(5);
+		bstate->subscriber.add_topic(std::move(alt_topic), ! after_zeek_init);
+		}
+
 	return true;
 	}
 
@@ -931,6 +950,12 @@ void Manager::Process()
 
 	if ( had_input )
 		{
+		if ( network_time == 0 )
+			// If we're getting Broker messages, but still haven't initialized
+			// network_time, may as well do so now because otherwise the
+			// broker/cluster logs will end up using timestamp 0.
+			net_update_time(current_time());
+
 		++times_processed_without_idle;
 
 		// The max number of Process calls allowed to happen in a row without

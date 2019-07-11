@@ -80,7 +80,6 @@ extern bool udp_content_deliver_all_orig;
 extern bool udp_content_deliver_all_resp;
 
 extern double dns_session_timeout;
-extern double ntp_session_timeout;
 extern double rpc_timeout;
 
 extern ListVal* skip_authentication;
@@ -106,8 +105,6 @@ extern TableType* pm_mappings;
 extern RecordType* pm_port_request;
 extern RecordType* pm_callit_request;
 
-extern RecordType* ntp_msg;
-
 extern RecordType* geo_location;
 
 extern RecordType* entropy_test_result;
@@ -131,30 +128,9 @@ extern double stp_delta;
 extern double stp_idle_min;
 extern TableVal* stp_skip_src;
 
-extern double interconn_min_interarrival;
-extern double interconn_max_interarrival;
-extern int interconn_max_keystroke_pkt_size;
-extern int interconn_default_pkt_size;
-extern double interconn_stat_period;
-extern double interconn_stat_backoff;
-extern RecordType* interconn_endp_stats;
-
-extern double backdoor_stat_period;
-extern double backdoor_stat_backoff;
-
-extern RecordType* backdoor_endp_stats;
-
-extern RecordType* software;
-extern RecordType* software_version;
-extern RecordType* OS_version;
-extern EnumType* OS_version_inference;
-extern TableVal* generate_OS_version_event;
-
 extern double table_expire_interval;
 extern double table_expire_delay;
 extern int table_incremental_step;
-
-extern RecordType* packet_type;
 
 extern int orig_addr_anonymization, resp_addr_anonymization;
 extern int other_addr_anonymization;
@@ -164,16 +140,10 @@ extern TableVal* preserve_other_addr;
 
 extern double connection_status_update_interval;
 
-extern int max_files_in_cache;
 extern RecordType* rotate_info;
 extern StringVal* log_rotate_base_time;
 
 extern StringVal* peer_description;
-extern bro_uint_t chunked_io_buffer_soft_cap;
-
-extern StringVal* ssl_ca_certificate;
-extern StringVal* ssl_private_key;
-extern StringVal* ssl_passphrase;
 
 extern Val* profiling_file;
 extern double profiling_interval;
@@ -192,7 +162,6 @@ extern int sig_max_group_size;
 
 extern TableType* irc_join_list;
 extern RecordType* irc_join_info;
-extern TableVal* irc_servers;
 
 extern int dpd_reassemble_first_packets;
 extern int dpd_buffer_size;
@@ -202,7 +171,6 @@ extern int dpd_ignore_ports;
 extern TableVal* likely_server_ports;
 
 extern int check_for_unused_event_handlers;
-extern int dump_used_event_handlers;
 
 extern int suppress_local_output;
 

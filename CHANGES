@@ -1,4 +1,320 @@
 
+2.6-576 | 2019-07-10 18:38:54 -0700
+
+  * Remove unused option: chunked_io_buffer_soft_cap (Jon Siwek, Corelight)
+
+2.6-575 | 2019-07-09 18:28:03 -0700
+
+  * Avoid a null dereference (Coverity-1402816) (Tim Wojtulewicz, Corelight)
+
+  * Avoid resource leaks (Coverity-1402818, Coverity-1402812) (Tim Wojtulewicz, Corelight)
+
+  * Avoid null dereference in broker (Coverity-1402824, Coverity-1402814) (Tim Wojtulewicz, Corelight)
+
+  * Improve stability of a unit test (Jon Siwek, Corelight)
+
+2.6-569 | 2019-07-03 13:03:22 -0700
+
+  * Improve stability of a unit test (Jon Siwek, Corelight)
+
+2.6-568 | 2019-07-03 11:50:56 -0700
+
+  * Add clang-tidy rule to CMake including a base configuration (Tim Wojtulewicz, Corelight)
+
+2.6-566 | 2019-07-03 11:08:24 -0700
+
+  * Improve Zeekygen output for long attribute expressions (Jon Siwek, Corelight)
+
+2.6-565 | 2019-07-03 09:32:34 -0700
+
+  * GH-446: Deprecate rfb_event. (Johanna Amann, Corelight)
+
+2.6-563 | 2019-07-03 01:57:40 -0700
+
+  * Fix CIF integration and add logging options to intel.log and added comments to code (sfinlon)
+
+2.6-558 | 2019-07-01 01:27:50 -0700
+
+  * GH-443: fix uses of timestamp 0 in cluster diagnostic logs
+
+    For broker.log and cluster.log: there was a race condition.  A worker's
+    first IOSource that it processes is potentially Broker if there were
+    no packets available yet and thread scheduling happens to work out
+    such that network connections (inside CAF threads) become established
+    before we enter the main I/O loop.  Such peering establishments would
+    generate logs with timestamp 0 as there was not yet any code path
+    taken that would update network_time.
+
+    For reporter.log: any non-worker (packet-processing) node would just
+    unnecessarily use a timestamp of 0 for their reporter messages. (Jon Siwek, Corelight)
+
+2.6-556 | 2019-07-01 00:56:13 -0700
+
+  * Improve deprecation warning messages (Jon Siwek, Corelight)
+
+  * Remove deprecated DNS events
+
+    - dns_full_request
+    - non_dns_request (Jon Siwek, Corelight)
+
+  * Remove BackDoor analyzer (Jon Siwek, Corelight)
+
+  * Remove InterConn analyzer (Jon Siwek, Corelight)
+
+  * Remove deprecated/unused irc_servers option (Jon Siwek, Corelight)
+
+  * Remove deprecated print_hook event (Jon Siwek, Corelight)
+
+  * Remove dead code: dump_used_event_handlers (Jon Siwek, Corelight)
+
+  * Remove unused software_version_found events
+
+    - software_version_found
+    - software_unparsed_version_found
+    - software_parse_error (Jon Siwek, Corelight)
+
+  * Remove deprecated open_log_file and log_file_name functions (Jon Siwek, Corelight)
+
+  * Remove deprecated/unused "packet" type (Jon Siwek, Corelight)
+
+  * Un-deprecate anonymizer BIFs (Jon Siwek, Corelight)
+
+  * Un-deprecate file rotation functions
+
+    - rotate_file
+    - rotate_file_by_name
+    - calc_next_rotate
+
+    These still have use-cases even though no longer used for our logging
+    functionality.  E.g. rotate_file_by_name may be used to rotate
+    pcap dump files.
+
+    Also the log_rotate_base_time option was marked deprecated, but still
+    used in the new logging framework. (Jon Siwek, Corelight)
+
+  * Switch default CAF scheduler policy to work sharing
+
+    It may generally be better for our default use-case, as workers may
+    save a few percent cpu utilization as this policy does not have to
+    use any polling like the stealing policy does.
+
+    This also helps avoid a potential issue with the implementation of
+    spinlocks used in the work-stealing policy in current CAF versions,
+    where there's some conditions where lock contention causes a thread
+    to spin for long periods without relinquishing the cpu to others. (Jon Siwek, Corelight)
+
+  * Update sqlite to 3.28.0.  (Johanna Amann, Corelight)
+
+  * GH-320: Improve RFB (VNC) protocol parsing
+
+    Parsing now stops for both client and server if either encounters
+    any parsing error or invalid state.
+
+    After a complete handshake, server messages are no longer parsed.
+    Support for that is incomplete and not sure it's that useful anyway
+    since it mostly contains pixel data. (Jon Siwek, Corelight)
+
+2.6-536 | 2019-06-28 12:10:55 -0700
+
+  * Add Windows Minidump file signature (Alexander Bolshakov)
+
+2.6-534 | 2019-06-28 11:48:41 -0700
+
+  * Change notices to be processed on worker. (Johanna Amann, Corelight)
+
+    In the past they were processed on the manager - which requires big
+    records to be sent around.
+
+    This has a potential of incompatibilities if someone relied on global
+    state for notice processing.
+
+    Also may prevent notice de-duplication due to expected race
+    condition of suppression messages taking time to proaogate out
+    to all cluster nodes.
+
+2.6-531 | 2019-06-27 12:09:08 -0700
+
+  * GH-375: Remove the BroFile cache (Johanna Amann, Corelight)
+
+2.6-529 | 2019-06-27 10:12:34 -0700
+
+  * Fix creating a StringVal from std::string. (Johanna Amann, Corelight)
+
+    Currently, creating a StringVal from a std::string did not work with
+    data that contains \0 characters. This easy fix changes this - and
+    should also lead to a small speed increase for code using this
+    constructor.
+
+    This obviously means that more data might copied now in some cases that
+    were previously cut off at the first 0-byte. Our test-suite did not
+    reveal any such cases.
+
+2.6-526 | 2019-06-25 12:45:31 -0700
+
+  * Make a paraglob unit test parallelizable (Jon Siwek, Corelight)
+
+2.6-523 | 2019-06-25 10:38:24 -0700
+
+  * GH-427: improve default ID values shown by Zeekygen
+
+    The default value of an ID is now truly the one used to initialize it,
+    unaltered by any subsequent redefs.
+
+    Redefs are now shown separately, along with the expression that
+    modifies the ID's value. (Jon Siwek, Corelight)
+
+  * Unbreak build on Linux (Johanna Amann, Corelight)
+
+2.6-519 | 2019-06-24 15:25:08 -0700
+
+  * GH-435: fix null pointer deref in RPC analyzer. (Jon Siwek, Corelight)
+
+2.6-517 | 2019-06-24 15:20:39 -0700
+
+  * Add paraglob, a fairly quick data structure for matching a string against a large list of patterns.
+	 (Zeke Medley, Corelight)
+
+  * GH-171: support warning messages alongside deprecated attributes (Tim Wojtulewicz, Corelight)
+
+2.6-503 | 2019-06-21 11:17:58 -0700
+
+  * GH-417: Remove old, unmaintained p0f support. (Johanna Amann, Corelight)
+
+2.6-500 | 2019-06-20 20:54:15 -0700
+
+  * Add new RDP event: rdp_client_cluster_data (Jeff Atkinson)
+
+  * Added "options" field to RDP::ClientChannelDef (Jeff Atkinson)
+
+2.6-494 | 2019-06-20 20:24:38 -0700
+
+  * Renaming src/StateAccess.{h,cc} to src/Notifier.{h,cc}.
+
+    The old names did not reflect the content of the files anymore. (Robin Sommer, Corelight)
+
+  * Remove MutableVal, StateAccess classes, enum Opcode. (Robin Sommer, Corelight)
+
+  * Redo API for notifiers.
+
+    There's now an notifier::Modifiable interface class that class
+    supposed to signal modifications are to be derived from. This takes
+    the place of the former MutableValue class and also unifies how Val
+    and IDs signal modifications. (Robin Sommer, Corelight)
+
+  * Redo NotfifierRegistry to no longer rely on StateAccess.
+
+    We simplify the API to a simple Modified() operation. (Robin Sommer, Corelight)
+
+  * Add new test for when-statement watching global variables. (Robin Sommer, Corelight)
+
+2.6-482 | 2019-06-20 19:57:20 -0700
+
+  * Make configure complain if submodules are not checked out. (Johanna Amann, Corelight)
+
+  * Improve C++ header includes to improve build time (Jon Siwek, Corelight)
+
+2.6-479 | 2019-06-20 18:31:58 -0700
+
+  * Fix TableVal::DoClone to use CloneState cache (Jon Siwek, Corelight)
+
+2.6-478 | 2019-06-20 14:19:11 -0700
+
+  * Remove old Broccoli SSL options (Jon Siwek, Corelight)
+
+    - ssl_ca_certificate
+    - ssl_private_key
+    - ssl_passphrase
+
+2.6-477 | 2019-06-20 14:00:22 -0700
+
+  * Remove unused SerialInfo.h and SerialTypes.h headers (Jon Siwek, Corelight)
+
+2.6-476 | 2019-06-20 13:23:22 -0700
+
+  * Remove opaque of ocsp_resp. (Johanna Amann, Corelight)
+
+    Only used in one event, without any way to use the opaque for anything
+    else. At this point this just seems like a complication that has no
+    reason to be there.
+
+  * Remove remnants of event serializer. (Johanna Amann, Corelight)
+
+  * Reimplement serialization infrastructure for OpaqueVals.
+    (Robin Sommer, Corelight & Johanna Amann, Corelight)
+
+    We need this to sender through Broker, and we also leverage it for
+    cloning opaques. The serialization methods now produce Broker data
+    instances directly, and no longer go through the binary formatter.
+
+    Summary of the new API for types derived from OpaqueVal:
+
+        - Add DECLARE_OPAQUE_VALUE(<class>) to the class declaration
+        - Add IMPLEMENT_OPAQUE_VALUE(<class>) to the class' implementation file
+        - Implement these two methods (which are declated by the 1st macro):
+            - broker::data DoSerialize() const
+            - bool DoUnserialize(const broker::data& data)
+
+    This machinery should work correctly from dynamic plugins as well.
+
+    OpaqueVal provides a default implementation of DoClone() as well that
+    goes through serialization. Derived classes can provide a more
+    efficient version if they want.
+
+    The declaration of the "OpaqueVal" class has moved into the header
+    file "OpaqueVal.h", along with the new serialization infrastructure.
+    This is breaking existing code that relies on the location, but
+    because the API is changing anyways that seems fine.
+
+  * Implement a Shallow Clone operation for types. (Johanna Amann, Corelight)
+
+    This is needed to track name changes for the documentation.
+
+  * Remove old serialization infrastrucutre. (Johanna Amann, Corelight)
+
+2.6-454 | 2019-06-19 09:39:06 -0700
+
+  * GH-393: Add slice notation for vectors (Tim Wojtulewicz, Corelight & Jon Siwek, Corelight)
+
+    Example Syntax:
+
+    local v = vector(1, 2, 3, 4, 5);
+    v[2:4] = vector(6, 7, 8);        # v is now [1, 2, 6, 7, 8, 5]
+    print v[:4];                     # prints [1, 2, 6, 7]
+
+2.6-446 | 2019-06-17 20:26:49 -0700
+
+  * Rename bro to zeek in error messages (Daniel Thayer)
+
+2.6-444 | 2019-06-15 19:09:03 -0700
+
+  * Add/rewrite NTP support (Vlad Grigorescu and Mauro Palumbo)
+
+2.6-416 | 2019-06-14 20:57:57 -0700
+
+  * DNS: Add support for SPF response records (Vlad Grigorescu)
+
+2.6-413 | 2019-06-14 19:51:28 -0700
+
+  * GH-406: rename bro.bif to zeek.bif (Jon Siwek, Corelight)
+
+2.6-412 | 2019-06-14 19:26:21 -0700
+
+  * GH-387: update Broker topic names to use "zeek/" prefix (Jon Siwek, Corelight)
+
+  * GH-323: change builtin plugin namespaces to Zeek (Jon Siwek, Corelight)
+
+2.6-408 | 2019-06-13 11:19:50 -0700
+
+  * Fix potential null-dereference in current_time() (Tim Wojtulewicz, Corelight)
+
+  * Add --sanitizers configure script to enable Clang sanitizers (Tim Wojtulewicz, Corelight)
+
+2.6-404 | 2019-06-12 15:10:19 -0700
+
+  * Rename directories from bro to zeek (Daniel Thayer)
+
+    The new default installation prefix is /usr/local/zeek
+
 2.6-400 | 2019-06-07 20:06:33 -0700
 
   * Adapt bro_plugin CMake macros to use zeek_plugin (Jon Siwek, Corelight)
@@ -15,6 +331,7 @@
     several newer packets (like the hello retry).
 
   * Parse TLS 1.3 pre-shared-key extension. (Johanna Amann)
+
 
     Adds new events:
 

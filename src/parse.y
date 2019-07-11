@@ -5,7 +5,7 @@
 // Switching parser table type fixes ambiguity problems.
 %define lr.type ielr
 
-%expect 103
+%expect 105
 
 %token TOK_ADD TOK_ADD_TO TOK_ADDR TOK_ANY
 %token TOK_ATENDIF TOK_ATELSE TOK_ATIF TOK_ATIFDEF TOK_ATIFNDEF
@@ -50,14 +50,14 @@
 %left '$' '[' ']' '(' ')' TOK_HAS_FIELD TOK_HAS_ATTR
 %nonassoc TOK_AS TOK_IS
 
-%type <b> opt_no_test opt_no_test_block opt_deprecated TOK_PATTERN_END
+%type <b> opt_no_test opt_no_test_block TOK_PATTERN_END
 %type <str> TOK_ID TOK_PATTERN_TEXT
 %type <id> local_id global_id def_global_id event_id global_or_event_id resolve_id begin_func case_type
 %type <id_l> local_id_list case_type_list
 %type <ic> init_class
 %type <expr> opt_init
 %type <val> TOK_CONSTANT
-%type <expr> expr opt_expr init anonymous_function
+%type <expr> expr opt_expr init anonymous_function index_slice opt_deprecated
 %type <event_expr> event
 %type <stmt> stmt stmt_list func_body for_head
 %type <type> type opt_type enum_body
@@ -464,6 +464,12 @@ expr:
 	|	expr '=' expr
 			{
 			set_location(@1, @3);
+
+			if ( $1->Tag() == EXPR_INDEX && $1->AsIndexExpr()->IsSlice() )
+				reporter->Error("index slice assignment may not be used"
+				                " in arbitrary expression contexts, only"
+				                " as a statement");
+
 			$$ = get_assign_expr($1, $3, in_init);
 			}
 
@@ -479,15 +485,7 @@ expr:
 			$$ = new IndexExpr($1, $3);
 			}
 
-	|	expr '[' opt_expr ':' opt_expr ']'
-			{
-			set_location(@1, @6);
-			Expr* low = $3 ? $3 : new ConstExpr(val_mgr->GetCount(0));
-			Expr* high = $5 ? $5 : new SizeExpr($1);
-			ListExpr* le = new ListExpr(low);
-			le->Append(high);
-			$$ = new IndexExpr($1, le, true);
-			}
+	|	index_slice
 
 	|	expr '$' TOK_ID
 			{
@@ -702,7 +700,7 @@ expr:
 					$$ = new NameExpr(id);
 
 				if ( id->IsDeprecated() )
-					reporter->Warning("deprecated (%s)", id->Name());
+					reporter->Warning("%s", id->GetDeprecationWarning().c_str());
 				}
 			}
 
@@ -1004,7 +1002,7 @@ type:
 				Ref($$);
 
 				if ( $1->IsDeprecated() )
-					reporter->Warning("deprecated (%s)", $1->Name());
+					reporter->Warning("%s", $1->GetDeprecationWarning().c_str());
 				}
 			}
 	;
@@ -1098,7 +1096,7 @@ decl:
 	|	TOK_REDEF global_id opt_type init_class opt_init opt_attr ';'
 			{
 			add_global($2, $3, $4, $5, $6, VAR_REDEF);
-			zeekygen_mgr->Redef($2, ::filename);
+			zeekygen_mgr->Redef($2, ::filename, $4, $5);
 			}
 
 	|	TOK_REDEF TOK_ENUM global_id TOK_ADD_TO '{'
@@ -1267,6 +1265,21 @@ init:
 	|	expr
 	;
 
+index_slice:
+		expr '[' opt_expr ':' opt_expr ']'
+			{
+			set_location(@1, @6);
+			Expr* low = $3 ? $3 : new ConstExpr(val_mgr->GetCount(0));
+			Expr* high = $5 ? $5 : new SizeExpr($1);
+
+			if ( ! IsIntegral(low->Type()->Tag()) || ! IsIntegral(high->Type()->Tag()) )
+				reporter->Error("slice notation must have integral values as indexes");
+
+			ListExpr* le = new ListExpr(low);
+			le->Append(high);
+			$$ = new IndexExpr($1, le, true);
+			}
+
 opt_attr:
 		attr_list
 	|
@@ -1314,6 +1327,19 @@ attr:
 			{ $$ = new Attr(ATTR_ERROR_HANDLER); }
 	|	TOK_ATTR_DEPRECATED
 			{ $$ = new Attr(ATTR_DEPRECATED); }
+	|	TOK_ATTR_DEPRECATED '=' TOK_CONSTANT
+			{
+			if ( IsString($3->Type()->Tag()) )
+				$$ = new Attr(ATTR_DEPRECATED, new ConstExpr($3));
+			else
+				{
+				ODesc d;
+				$3->Describe(&d);
+				reporter->Error("'&deprecated=%s' must use a string literal",
+				                d.Description());
+				$$ = new Attr(ATTR_DEPRECATED);
+				}
+			}
 	;
 
 stmt:
@@ -1470,6 +1496,15 @@ stmt:
 			    brofiler.DecIgnoreDepth();
 			}
 
+	|	index_slice '=' expr ';' opt_no_test
+			{
+			set_location(@1, @4);
+			$$ = new ExprStmt(get_assign_expr($1, $3, in_init));
+
+			if ( ! $5 )
+				brofiler.AddStmt($$);
+			}
+
 	|	expr ';' opt_no_test
 			{
 			set_location(@1, @2);
@@ -1513,7 +1548,7 @@ event:
 					YYERROR;
 					}
 				if ( id->IsDeprecated() )
-					reporter->Warning("deprecated (%s)", id->Name());
+					reporter->Warning("%s", id->GetDeprecationWarning().c_str());
 				}
 
 			$$ = new EventExpr($1, $3);
@@ -1719,7 +1754,7 @@ global_or_event_id:
 
 					if ( t->Tag() != TYPE_FUNC ||
 					     t->AsFuncType()->Flavor() != FUNC_FLAVOR_FUNCTION )
-						reporter->Warning("deprecated (%s)", $$->Name());
+						reporter->Warning("%s", $$->GetDeprecationWarning().c_str());
 					}
 
 				delete [] $1;
@@ -1765,9 +1800,23 @@ opt_no_test_block:
 
 opt_deprecated:
 		TOK_ATTR_DEPRECATED
-			{ $$ = true; }
+			{ $$ = new ConstExpr(new StringVal("")); }
 	|
-			{ $$ = false; }
+		TOK_ATTR_DEPRECATED '=' TOK_CONSTANT
+			{
+			if ( IsString($3->Type()->Tag()) )
+				$$ = new ConstExpr($3);
+			else
+				{
+				ODesc d;
+				$3->Describe(&d);
+				reporter->Error("'&deprecated=%s' must use a string literal",
+				                d.Description());
+				$$ = new ConstExpr(new StringVal(""));
+				}
+			}
+	|
+			{ $$ = nullptr; }
 
 %%
 

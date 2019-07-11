@@ -83,7 +83,7 @@ Manager::Manager(const string& arg_config, const string& bro_command)
 	// a PATH component that starts with a tilde (such as "~/bin").  A simple
 	// workaround is to just run bro with a relative or absolute path.
 	if ( path_to_bro.empty() || stat(path_to_bro.c_str(), &s) < 0 )
-		reporter->InternalError("Zeekygen can't get mtime of bro binary %s (try again by specifying the absolute or relative path to Bro): %s",
+		reporter->InternalError("Zeekygen can't get mtime of zeek binary %s (try again by specifying the absolute or relative path to Zeek): %s",
 		                        path_to_bro.c_str(), strerror(errno));
 
 	bro_mtime = s.st_mtime;
@@ -352,7 +352,8 @@ void Manager::RecordField(const ID* id, const TypeDecl* field,
 	        field->id, id->Name(), script.c_str());
 	}
 
-void Manager::Redef(const ID* id, const string& path)
+void Manager::Redef(const ID* id, const string& path,
+                    init_class ic, Expr* init_expr)
 	{
 	if ( disabled )
 		return;
@@ -380,7 +381,7 @@ void Manager::Redef(const ID* id, const string& path)
 		return;
 		}
 
-	id_info->AddRedef(from_script, comment_buffer);
+	id_info->AddRedef(from_script, ic, init_expr, comment_buffer);
 	script_info->AddRedef(id_info);
 	comment_buffer.clear();
 	last_identifier_seen = id_info;

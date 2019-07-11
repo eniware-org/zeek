@@ -51,7 +51,7 @@ public:
 		{ return tag == ATTR_REDEF || tag == ATTR_OPTIONAL; }
 
 	void Describe(ODesc* d) const override;
-	void DescribeReST(ODesc* d) const;
+	void DescribeReST(ODesc* d, bool shorten = false) const;
 
 	bool operator==(const Attr& other) const
 		{
@@ -88,20 +88,15 @@ public:
 	void RemoveAttr(attr_tag t);
 
 	void Describe(ODesc* d) const override;
-	void DescribeReST(ODesc* d) const;
+	void DescribeReST(ODesc* d, bool shorten = false) const;
 
 	attr_list* Attrs()	{ return attrs; }
-
-	bool Serialize(SerialInfo* info) const;
-	static Attributes* Unserialize(UnserialInfo* info);
 
 	bool operator==(const Attributes& other) const;
 
 protected:
 	Attributes() : type(), attrs(), in_record()	{ }
 	void CheckAttr(Attr* attr);
-
-	DECLARE_SERIAL(Attributes);
 
 	BroType* type;
 	attr_list* attrs;

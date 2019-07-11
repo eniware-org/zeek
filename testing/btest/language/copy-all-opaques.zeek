@@ -27,6 +27,10 @@ event zeek_init()
 	hll_cardinality_add(c1, 2004);
 	print hll_cardinality_estimate(c2);
 
+	local c3 = hll_cardinality_init(0.01, 0.95);
+	hll_cardinality_merge_into(c3, c2);
+	print hll_cardinality_estimate(c3);
+
 	print "============ Bloom";
 	local bf_cnt = bloomfilter_basic_init(0.1, 1000);
 	bloomfilter_add(bf_cnt, 42);
@@ -78,4 +82,12 @@ event zeek_init()
 	local handle2 = copy(handle);
 	print entropy_test_finish(handle);
 	print entropy_test_finish(handle2);
+
+	print "============ Paraglob";
+	local p = paraglob_init(vector("https://*.google.com/*", "*malware*", "*.gov*"));
+	local p2 = copy(p);
+	print paraglob_equals(p, p2);
+	# A get operation shouldn't change the paraglob
+	paraglob_match(p, "whitehouse.gov");
+	print paraglob_equals(p, p2);
 	}

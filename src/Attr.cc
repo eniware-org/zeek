@@ -4,7 +4,6 @@
 
 #include "Attr.h"
 #include "Expr.h"
-#include "Serializer.h"
 #include "threading/SerialTypes.h"
 
 const char* attr_name(attr_tag t)
@@ -46,8 +45,33 @@ void Attr::Describe(ODesc* d) const
 		}
 	}
 
-void Attr::DescribeReST(ODesc* d) const
+void Attr::DescribeReST(ODesc* d, bool shorten) const
 	{
+	auto add_long_expr_string = [](ODesc* d, const std::string& s, bool shorten)
+		{
+		constexpr auto max_expr_chars = 32;
+		constexpr auto shortened_expr = "*...*";
+
+		if ( s.size() > max_expr_chars )
+			{
+			if ( shorten )
+				d->Add(shortened_expr);
+			else
+				{
+				// Long inline-literals likely won't wrap well in HTML render
+				d->Add("*");
+				d->Add(s);
+				d->Add("*");
+				}
+			}
+		else
+			{
+			d->Add("``");
+			d->Add(s);
+			d->Add("``");
+			}
+		};
+
 	d->Add(":zeek:attr:`");
 	AddTag(d);
 	d->Add("`");
@@ -57,7 +81,6 @@ void Attr::DescribeReST(ODesc* d) const
 		d->SP();
 		d->Add("=");
 		d->SP();
-
 
 		if ( expr->Tag() == EXPR_NAME )
 			{
@@ -75,14 +98,15 @@ void Attr::DescribeReST(ODesc* d) const
 
 		else if ( expr->Tag() == EXPR_CONST )
 			{
-			d->Add("``");
-			expr->Describe(d);
-			d->Add("``");
+			ODesc dd;
+			dd.SetQuotes(1);
+			expr->Describe(&dd);
+			string s = dd.Description();
+			add_long_expr_string(d, s, shorten);
 			}
 
 		else
 			{
-			d->Add("``");
 			Val* v = expr->Eval(0);
 			ODesc dd;
 			v->Describe(&dd);
@@ -93,8 +117,7 @@ void Attr::DescribeReST(ODesc* d) const
 				if ( s[i] == '\n' )
 					s[i] = ' ';
 
-			d->Add(s);
-			d->Add("``");
+			add_long_expr_string(d, s, shorten);
 			}
 		}
 	}
@@ -212,14 +235,14 @@ void Attributes::Describe(ODesc* d) const
 		}
 	}
 
-void Attributes::DescribeReST(ODesc* d) const
+void Attributes::DescribeReST(ODesc* d, bool shorten) const
 	{
 	loop_over_list(*attrs, i)
 		{
 		if ( i > 0 )
 			d->Add(" ");
 
-		(*attrs)[i]->DescribeReST(d);
+		(*attrs)[i]->DescribeReST(d, shorten);
 		}
 	}
 
@@ -504,73 +527,6 @@ bool Attributes::operator==(const Attributes& other) const
 
 		if ( ! (*a == *o) )
 			return false;
-		}
-
-	return true;
-	}
-
-bool Attributes::Serialize(SerialInfo* info) const
-	{
-	return SerialObj::Serialize(info);
-	}
-
-Attributes* Attributes::Unserialize(UnserialInfo* info)
-	{
-	return (Attributes*) SerialObj::Unserialize(info, SER_ATTRIBUTES);
-	}
-
-IMPLEMENT_SERIAL(Attributes, SER_ATTRIBUTES);
-
-bool Attributes::DoSerialize(SerialInfo* info) const
-	{
-	DO_SERIALIZE(SER_ATTRIBUTES, BroObj);
-
-	info->s->WriteOpenTag("Attributes");
-	assert(type);
-	if ( ! (type->Serialize(info) && SERIALIZE(attrs->length())) )
-		return false;
-
-	loop_over_list((*attrs), i)
-		{
-		Attr* a = (*attrs)[i];
-
-		Expr* e = a->AttrExpr();
-		SERIALIZE_OPTIONAL(e);
-
-		if ( ! SERIALIZE(char(a->Tag())) )
-			return false;
-		}
-
-	info->s->WriteCloseTag("Attributes");
-	return true;
-	}
-
-bool Attributes::DoUnserialize(UnserialInfo* info)
-	{
-	DO_UNSERIALIZE(BroObj);
-
-	type = BroType::Unserialize(info);
-	if ( ! type )
-		return false;
-
-	int len;
-	if ( ! UNSERIALIZE(&len) )
-		return false;
-
-	attrs = new attr_list(len);
-	while ( len-- )
-		{
-		Expr* e;
-		UNSERIALIZE_OPTIONAL(e, Expr::Unserialize(info))
-
-		char tag;
-		if ( ! UNSERIALIZE(&tag) )
-			{
-			delete e;
-			return false;
-			}
-
-		attrs->append(new Attr((attr_tag)tag, e));
 		}
 
 	return true;
