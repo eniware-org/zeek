@@ -52,8 +52,6 @@ static void input_hash_delete_func(void* val)
 	delete h;
 	}
 
-declare(PDict, InputHash);
-
 /**
  * Base stuff that every stream can do.
  */
@@ -109,8 +107,8 @@ public:
 	RecordType* rtype;
 	RecordType* itype;
 
-	PDict(InputHash)* currDict;
-	PDict(InputHash)* lastDict;
+	PDict<InputHash>* currDict;
+	PDict<InputHash>* lastDict;
 
 	Func* pred;
 
@@ -703,9 +701,9 @@ bool Manager::CreateTableStream(RecordVal* fval)
 	stream->itype = idx->AsRecordType();
 	stream->event = event ? event_registry->Lookup(event->Name()) : 0;
 	stream->error_event = error_event ? event_registry->Lookup(error_event->Name()) : nullptr;
-	stream->currDict = new PDict(InputHash);
+	stream->currDict = new PDict<InputHash>;
 	stream->currDict->SetDeleteFunc(input_hash_delete_func);
-	stream->lastDict = new PDict(InputHash);
+	stream->lastDict = new PDict<InputHash>;
 	stream->lastDict->SetDeleteFunc(input_hash_delete_func);
 	stream->want_record = ( want_record->InternalInt() == 1 );
 
@@ -1425,7 +1423,7 @@ void Manager::EndCurrentSend(ReaderFrontend* reader)
 	delete(stream->lastDict);
 
 	stream->lastDict = stream->currDict;
-	stream->currDict = new PDict(InputHash);
+	stream->currDict = new PDict<InputHash>;
 	stream->currDict->SetDeleteFunc(input_hash_delete_func);
 
 #ifdef DEBUG
@@ -1827,7 +1825,7 @@ bool Manager::CallPred(Func* pred_func, const int numvals, ...) const
 	va_list lP;
 	va_start(lP, numvals);
 	for ( int i = 0; i < numvals; i++ )
-		vl.append( va_arg(lP, Val*) );
+		vl.push_back( va_arg(lP, Val*) );
 
 	va_end(lP);
 
@@ -1883,7 +1881,7 @@ bool Manager::SendEvent(ReaderFrontend* reader, const string& name, const int nu
 	for ( int j = 0; j < num_vals; j++)
 		{
 		Val* v = ValueToVal(i, vals[j], convert_error);
-		vl.append(v);
+		vl.push_back(v);
 		if ( v && ! convert_error && ! same_type(type->FieldType(j), v->Type()) )
 			{
 			convert_error = true;
@@ -1895,8 +1893,8 @@ bool Manager::SendEvent(ReaderFrontend* reader, const string& name, const int nu
 
 	if ( convert_error )
 		{
-		loop_over_list(vl, i)
-			Unref(vl[i]);
+		for ( const auto& v : vl )
+			Unref(v);
 
 		return false;
 		}
@@ -1918,7 +1916,7 @@ void Manager::SendEvent(EventHandlerPtr ev, const int numvals, ...) const
 	va_list lP;
 	va_start(lP, numvals);
 	for ( int i = 0; i < numvals; i++ )
-		vl.append( va_arg(lP, Val*) );
+		vl.push_back( va_arg(lP, Val*) );
 
 	va_end(lP);
 
@@ -1935,7 +1933,7 @@ void Manager::SendEvent(EventHandlerPtr ev, list<Val*> events) const
 #endif
 
 	for ( list<Val*>::iterator i = events.begin(); i != events.end(); i++ )
-		vl.append( *i );
+		vl.push_back( *i );
 
 	mgr.QueueEvent(ev, std::move(vl), SOURCE_LOCAL);
 	}

@@ -901,17 +901,14 @@ function hrw_weight%(key_digest: count, site_id: count%): count
 	%{
 	uint32 d = key_digest;
 	d &= 0x7fffffff; // 31-bit digest
-	int32 si = site_id;
+	uint32 si = site_id;
 	auto a = 1103515245;
 	auto b = 12345;
 	auto m = 2147483648; // 2**31
 
-	int32 rval = (a * ((a * si + b) ^ d) + b) % m;
+	uint32 rval = (a * ((a * si + b) ^ d) + b) % m;
 
-	if ( rval < 0 )
-		rval += m; // [0, 2**31 - 1]
-
-	return val_mgr->GetCount((uint64) rval);
+	return val_mgr->GetCount(rval);
 	%}
 
 ## Generates a random number.
@@ -1335,8 +1332,8 @@ bool sort_function(Val* a, Val* b)
 		return 1;
 
 	val_list sort_func_args;
-	sort_func_args.append(a->Ref());
-	sort_func_args.append(b->Ref());
+	sort_func_args.push_back(a->Ref());
+	sort_func_args.push_back(b->Ref());
 
 	Val* result = sort_function_comp->Call(&sort_func_args);
 	int int_result = result->CoerceToInt();
@@ -1566,8 +1563,8 @@ function cat%(...%): string
 	ODesc d;
 	d.SetStyle(RAW_STYLE);
 
-	loop_over_list(@ARG@, i)
-		@ARG@[i]->Describe(&d);
+	for ( const auto& a : @ARG@ )
+		a->Describe(&d);
 
 	BroString* s = new BroString(1, d.TakeBytes(), d.Len());
 	s->SetUseFreeToDelete(true);
@@ -1898,7 +1895,7 @@ function reading_traces%(%): bool
 function global_sizes%(%): var_sizes
 	%{
 	TableVal* sizes = new TableVal(var_sizes);
-	PDict(ID)* globals = global_scope()->Vars();
+	PDict<ID>* globals = global_scope()->Vars();
 	IterCookie* c = globals->InitForIteration();
 
 	ID* id;
@@ -1925,7 +1922,7 @@ function global_sizes%(%): var_sizes
 function global_ids%(%): id_table
 	%{
 	TableVal* ids = new TableVal(id_table);
-	PDict(ID)* globals = global_scope()->Vars();
+	PDict<ID>* globals = global_scope()->Vars();
 	IterCookie* c = globals->InitForIteration();
 
 	ID* id;
@@ -1981,68 +1978,7 @@ function lookup_ID%(id: string%) : any
 ## Returns: A table that describes the fields of a record.
 function record_fields%(rec: any%): record_field_table
 	%{
-	TableVal* fields = new TableVal(record_field_table);
-
-	auto t = rec->Type();
-
-	if ( t->Tag() != TYPE_RECORD && t->Tag() != TYPE_TYPE )
-		{
-		reporter->Error("non-record value/type passed to record_fields");
-		return fields;
-		}
-
-	RecordType* rt = nullptr;
-	RecordVal* rv = nullptr;
-
-	if ( t->Tag() == TYPE_RECORD )
-		{
-		rt = t->AsRecordType();
-		rv = rec->AsRecordVal();
-		}
-	else
-		{
-		t = t->AsTypeType()->Type();
-
-		if ( t->Tag() != TYPE_RECORD )
-			{
-			reporter->Error("non-record value/type passed to record_fields");
-			return fields;
-			}
-
-		rt = t->AsRecordType();
-		}
-
-	for ( int i = 0; i < rt->NumFields(); ++i )
-		{
-		BroType* ft = rt->FieldType(i);
-		TypeDecl* fd = rt->FieldDecl(i);
-		Val* fv = nullptr;
-
-		if ( rv )
-			fv = rv->Lookup(i);
-
-		if ( fv )
-			Ref(fv);
-
-		bool logged = (fd->attrs && fd->FindAttr(ATTR_LOG) != 0);
-
-		RecordVal* nr = new RecordVal(record_field);
-
-		if ( ft->Tag() == TYPE_RECORD )
-			nr->Assign(0, new StringVal("record " + ft->GetName()));
-		else
-			nr->Assign(0, new StringVal(type_name(ft->Tag())));
-
-		nr->Assign(1, val_mgr->GetBool(logged));
-		nr->Assign(2, fv);
-		nr->Assign(3, rt->FieldDefault(i));
-
-		Val* field_name = new StringVal(rt->FieldName(i));
-		fields->Assign(field_name, nr);
-		Unref(field_name);
-		}
-
-	return fields;
+	return rec->GetRecordFields();
 	%}
 
 ## Enables detailed collection of profiling statistics. Statistics include
@@ -2485,7 +2421,17 @@ function count_to_port%(num: count, proto: transport_proto%): port
 function to_addr%(ip: string%): addr
 	%{
 	char* s = ip->AsString()->Render();
-	Val* ret = new AddrVal(s);
+	Val* ret = nullptr;
+	in6_addr tmp;
+
+	if ( IPAddr::ConvertString(s, &tmp) )
+		ret = new AddrVal(IPAddr(tmp));
+	else
+		{
+		ret = new AddrVal(IPAddr());
+		builtin_error("failed converting string to IP address", ip);
+		}
+
 	delete [] s;
 	return ret;
 	%}
@@ -2515,7 +2461,12 @@ function is_valid_ip%(ip: string%): bool
 function to_subnet%(sn: string%): subnet
 	%{
 	char* s = sn->AsString()->Render();
-	Val* ret = new SubNetVal(s);
+	IPPrefix tmp;
+
+	if ( ! IPPrefix::ConvertString(s, &tmp) )
+		builtin_error("failed converting string to IP prefix", sn);
+
+	Val* ret = new SubNetVal(tmp);
 	delete [] s;
 	return ret;
 	%}
@@ -5099,4 +5050,17 @@ function anonymize_addr%(a: addr, cl: IPAddrAnonymizationClass%): addr
 		return new AddrVal(anonymize_ip(*bytes,
 			(enum ip_addr_anonymization_class_t) anon_class));
 		}
+	%}
+
+## A function to convert arbitrary Zeek data into a JSON string.
+##
+## v: The value to convert to JSON.  Typically a record.
+##
+## only_loggable: If the v value is a record this will only cause
+##                fields with the &log attribute to be included in the JSON.
+##
+## returns: a JSON formatted string.
+function to_json%(val: any, only_loggable: bool &default=F, field_escape_pattern: pattern &default=/^_/%): string
+	%{
+	return val->ToJSON(only_loggable, field_escape_pattern);
 	%}

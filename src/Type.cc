@@ -207,16 +207,16 @@ unsigned int BroType::MemoryAllocation() const
 
 TypeList::~TypeList()
 	{
-	loop_over_list(types, i)
-		Unref(types[i]);
+	for ( const auto& type : types )
+		Unref(type);
 
 	Unref(pure_type);
 	}
 
 int TypeList::AllMatch(const BroType* t, int is_init) const
 	{
-	loop_over_list(types, i)
-		if ( ! same_type(types[i], t, is_init) )
+	for ( const auto& type : types )
+		if ( ! same_type(type, t, is_init) )
 			return 0;
 	return 1;
 	}
@@ -226,7 +226,7 @@ void TypeList::Append(BroType* t)
 	if ( pure_type && ! same_type(t, pure_type) )
 		reporter->InternalError("pure type-list violation");
 
-	types.append(t);
+	types.push_back(t);
 	}
 
 void TypeList::AppendEvenIfNotPure(BroType* t)
@@ -237,7 +237,7 @@ void TypeList::AppendEvenIfNotPure(BroType* t)
 		pure_type = 0;
 		}
 
-	types.append(t);
+	types.push_back(t);
 	}
 
 void TypeList::Describe(ODesc* d) const
@@ -381,9 +381,8 @@ TableType::TableType(TypeList* ind, BroType* yield)
 
 	type_list* tl = indices->Types();
 
-	loop_over_list(*tl, i)
+	for ( const auto& tli : *tl )
 		{
-		BroType* tli = (*tl)[i];
 		InternalTypeTag t = tli->InternalType();
 
 		if ( t == TYPE_INTERNAL_ERROR )
@@ -588,13 +587,23 @@ int FuncType::CheckArgs(const type_list* args, bool is_init) const
 	const type_list* my_args = arg_types->Types();
 
 	if ( my_args->length() != args->length() )
+		{
+		Warn(fmt("Wrong number of arguments for function. Expected %d, got %d.",
+			args->length(), my_args->length()));
 		return 0;
+		}
+
+	int success = 1;
 
 	for ( int i = 0; i < my_args->length(); ++i )
 		if ( ! same_type((*args)[i], (*my_args)[i], is_init) )
-			return 0;
+			{
+			Warn(fmt("Type mismatch in function argument #%d. Expected %s, got %s.",
+				i, type_name((*args)[i]->Tag()), type_name((*my_args)[i]->Tag())));
+			success = 0;
+			}
 
-	return 1;
+	return success;
 	}
 
 void FuncType::Describe(ODesc* d) const
@@ -650,7 +659,7 @@ void FuncType::DescribeReST(ODesc* d, bool roles_only) const
 TypeDecl::TypeDecl(BroType* t, const char* i, attr_list* arg_attrs, bool in_record)
 	{
 	type = t;
-	attrs = arg_attrs ? new Attributes(arg_attrs, t, in_record) : 0;
+	attrs = arg_attrs ? new Attributes(arg_attrs, t, in_record, false) : 0;
 	id = i;
 	}
 
@@ -704,8 +713,8 @@ RecordType::RecordType(type_decl_list* arg_types) : BroType(TYPE_RECORD)
 RecordType* RecordType::ShallowClone()
 	{
 	auto pass = new type_decl_list();
-	loop_over_list(*types, i)
-		pass->append(new TypeDecl(*(*types)[i]));
+	for ( const auto& type : *types )
+		pass->push_back(new TypeDecl(*type));
 	return new RecordType(pass);
 	}
 
@@ -713,8 +722,8 @@ RecordType::~RecordType()
 	{
 	if ( types )
 		{
-		loop_over_list(*types, i)
-			delete (*types)[i];
+		for ( auto type : *types )
+			delete type;
 
 		delete types;
 		}
@@ -823,17 +832,15 @@ const char* RecordType::AddFields(type_decl_list* others, attr_list* attr)
 
 	if ( attr )
 		{
-		loop_over_list(*attr, j)
+		for ( const auto& at : *attr )
 			{
-			if ( (*attr)[j]->Tag() == ATTR_LOG )
+			if ( at->Tag() == ATTR_LOG )
 				log = true;
 			}
 		}
 
-	loop_over_list(*others, i)
+	for ( const auto& td : *others )
 		{
-		TypeDecl* td = (*others)[i];
-
 		if ( ! td->FindAttr(ATTR_DEFAULT) &&
 		     ! td->FindAttr(ATTR_OPTIONAL) )
 			return "extension field must be &optional or have &default";
@@ -841,12 +848,12 @@ const char* RecordType::AddFields(type_decl_list* others, attr_list* attr)
 		if ( log )
 			{
 			if ( ! td->attrs )
-				td->attrs = new Attributes(new attr_list, td->type, true);
+				td->attrs = new Attributes(new attr_list, td->type, true, false);
 
 			td->attrs->AddAttr(new Attr(ATTR_LOG));
 			}
 
-		types->append(td);
+		types->push_back(td);
 		}
 
 	delete others;
@@ -883,11 +890,11 @@ void RecordType::DescribeFields(ODesc* d) const
 			{
 			d->AddCount(0);
 			d->AddCount(types->length());
-			loop_over_list(*types, i)
+			for ( const auto& type : *types )
 				{
-				(*types)[i]->type->Describe(d);
+				type->type->Describe(d);
 				d->SP();
-				d->Add((*types)[i]->id);
+				d->Add(type->id);
 				d->SP();
 				}
 			}
@@ -1091,6 +1098,9 @@ EnumType::EnumType(const EnumType* e)
 		names[it->first] = it->second;
 
 	vals = e->vals;
+
+	for ( auto& kv : vals )
+		::Ref(kv.second);
 	}
 
 EnumType* EnumType::ShallowClone()
@@ -1773,6 +1783,39 @@ BroType* merge_types(const BroType* t1, const BroType* t2)
 	case TYPE_ERROR:
 		return base_type(tg1);
 
+	case TYPE_ENUM:
+		{
+		// Could compare pointers t1 == t2, but maybe there's someone out
+		// there creating clones of the type, so safer to compare name.
+		if ( t1->GetName() != t2->GetName() )
+			{
+			std::string msg = fmt("incompatible enum types: '%s' and '%s'",
+			                      t1->GetName().data(), t2->GetName().data());
+
+			t1->Error(msg.data(), t2);
+			return 0;
+			}
+
+		// Doing a lookup here as a roundabout way of ref-ing t1, without
+		// changing the function params which has t1 as const and also
+		// (potentially) avoiding a pitfall mentioned earlier about clones.
+		auto id = global_scope()->Lookup(t1->GetName().data());
+
+		if ( id && id->AsType() && id->AsType()->Tag() == TYPE_ENUM )
+			// It should make most sense to return the real type here rather
+			// than a copy since it may be redef'd later in parsing.  If we
+			// return a copy, then whoever is using this return value won't
+			// actually see those changes from the redef.
+			return id->AsType()->Ref();
+
+		std::string msg = fmt("incompatible enum types: '%s' and '%s'"
+		                      " ('%s' enum type ID is invalid)",
+		                      t1->GetName().data(), t2->GetName().data(),
+		                      t1->GetName().data());
+		t1->Error(msg.data(), t2);
+		return 0;
+		}
+
 	case TYPE_TABLE:
 		{
 		const IndexType* it1 = (const IndexType*) t1;
@@ -1873,7 +1916,7 @@ BroType* merge_types(const BroType* t1, const BroType* t2)
 				return 0;
 				}
 
-			tdl3->append(new TypeDecl(tdl3_i, copy_string(td1->id)));
+			tdl3->push_back(new TypeDecl(tdl3_i, copy_string(td1->id)));
 			}
 
 		return new RecordType(tdl3);

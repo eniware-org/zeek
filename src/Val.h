@@ -20,6 +20,7 @@
 #include "Notifier.h"
 #include "IPAddr.h"
 #include "DebugLogger.h"
+#include "RE.h"
 
 // We have four different port name spaces: TCP, UDP, ICMP, and UNKNOWN.
 // We distinguish between them based on the bits specified in the *_PORT_MASK
@@ -32,9 +33,9 @@
 #define ICMP_PORT_MASK	0x30000
 
 class Val;
+class BroFunc;
 class Func;
 class BroFile;
-class RE_Matcher;
 class PrefixTable;
 
 class PortVal;
@@ -55,7 +56,6 @@ class StateAccess;
 class VectorVal;
 
 class TableEntryVal;
-declare(PDict,TableEntryVal);
 
 typedef union {
 	// Used for bool, int, enum.
@@ -77,7 +77,7 @@ typedef union {
 	Func* func_val;
 	BroFile* file_val;
 	RE_Matcher* re_val;
-	PDict(TableEntryVal)* table_val;
+	PDict<TableEntryVal>* table_val;
 	val_list* val_list_val;
 
 	vector<Val*>* vector_val;
@@ -228,7 +228,7 @@ public:
 	CONST_ACCESSOR2(TYPE_ENUM, int, int_val, AsEnum)
 	CONST_ACCESSOR(TYPE_STRING, BroString*, string_val, AsString)
 	CONST_ACCESSOR(TYPE_FUNC, Func*, func_val, AsFunc)
-	CONST_ACCESSOR(TYPE_TABLE, PDict(TableEntryVal)*, table_val, AsTable)
+	CONST_ACCESSOR(TYPE_TABLE, PDict<TableEntryVal>*, table_val, AsTable)
 	CONST_ACCESSOR(TYPE_RECORD, val_list*, val_list_val, AsRecord)
 	CONST_ACCESSOR(TYPE_FILE, BroFile*, file_val, AsFile)
 	CONST_ACCESSOR(TYPE_PATTERN, RE_Matcher*, re_val, AsPattern)
@@ -347,6 +347,10 @@ public:
 
 	static bool WouldOverflow(const BroType* from_type, const BroType* to_type, const Val* val);
 
+	TableVal* GetRecordFields();
+
+	StringVal* ToJSON(bool only_loggable=false, RE_Matcher* re=new RE_Matcher("^_"));
+
 protected:
 
 	friend class EnumType;
@@ -396,7 +400,7 @@ protected:
 #endif
 		}
 
-	ACCESSOR(TYPE_TABLE, PDict(TableEntryVal)*, table_val, AsNonConstTable)
+	ACCESSOR(TYPE_TABLE, PDict<TableEntryVal>*, table_val, AsNonConstTable)
 	ACCESSOR(TYPE_RECORD, val_list*, val_list_val, AsNonConstRecord)
 
 	// For internal use by the Val::Clone() methods.
@@ -530,6 +534,7 @@ public:
 
 	// Returns the port number in host order (not including the mask).
 	uint32 Port() const;
+	string Protocol() const;
 
 	// Tests for protocol types.
 	int IsTCP() const;
@@ -632,9 +637,12 @@ public:
 	// char* ExpandedString(int format = BroString::EXPANDED_STRING)
 	// 	{ return AsString()->ExpandedString(format); }
 
+	std::string ToStdString() const;
 	StringVal* ToUpper();
 
 	unsigned int MemoryAllocation() const override;
+
+	Val* Substitute(RE_Matcher* re, StringVal* repl, bool do_all);
 
 protected:
 	friend class Val;
@@ -768,6 +776,8 @@ protected:
 };
 
 class CompositeHash;
+class Frame;
+
 class TableVal : public Val, public notifier::Modifiable {
 public:
 	explicit TableVal(TableType* t, Attributes* attrs = 0);
@@ -869,6 +879,11 @@ public:
 
 	void InitTimer(double delay);
 	void DoExpire(double t);
+
+        // If the &default attribute is not a function, or the functon has
+        // already been initialized, this does nothing. Otherwise, evaluates
+        // the function in the frame allowing it to capture its closure.
+        void InitDefaultFunc(Frame* f);
 
 	unsigned int MemoryAllocation() const override;
 

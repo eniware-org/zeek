@@ -22,10 +22,6 @@ class Specific_RE_Matcher;
 class RE_Matcher;
 class DFA_State;
 
-declare(PDict,char);
-declare(PDict,CCL);
-declare(PList,CCL);
-
 extern int case_insensitive;
 extern CCL* curr_ccl;
 extern NFA_Machine* nfa;
@@ -68,7 +64,7 @@ public:
 	void InsertCCL(const char* txt, CCL* ccl) { ccl_dict.Insert(txt, ccl); }
 	int InsertCCL(CCL* ccl)
 		{
-		ccl_list.append(ccl);
+		ccl_list.push_back(ccl);
 		return ccl_list.length() - 1;
 		}
 	CCL* LookupCCL(const char* txt)	{ return ccl_dict.Lookup(txt); }
@@ -123,9 +119,9 @@ protected:
 	int multiline;
 	char* pattern_text;
 
-	PDict(char) defs;
-	PDict(CCL) ccl_dict;
-	PList(CCL) ccl_list;
+	PDict<char> defs;
+	PDict<CCL> ccl_dict;
+	PList<CCL> ccl_list;
 	EquivClass equiv_class;
 	int* ecs;
 	DFA_Machine* dfa;

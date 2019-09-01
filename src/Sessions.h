@@ -20,9 +20,6 @@ class Connection;
 class ConnCompressor;
 struct ConnID;
 
-declare(PDict,Connection);
-declare(PDict,FragReassembler);
-
 class Discarder;
 class PacketFilter;
 
@@ -93,9 +90,9 @@ public:
 	void GetStats(SessionStats& s) const;
 
 	void Weird(const char* name, const Packet* pkt,
-	    const EncapsulationStack* encap = 0);
+	    const EncapsulationStack* encap = 0, const char* addl = "");
 	void Weird(const char* name, const IP_Hdr* ip,
-	    const EncapsulationStack* encap = 0);
+	    const EncapsulationStack* encap = 0, const char* addl = "");
 
 	PacketFilter* GetPacketFilter()
 		{
@@ -216,10 +213,10 @@ protected:
 			      const Packet *pkt, const EncapsulationStack* encap);
 
 	CompositeHash* ch;
-	PDict(Connection) tcp_conns;
-	PDict(Connection) udp_conns;
-	PDict(Connection) icmp_conns;
-	PDict(FragReassembler) fragments;
+	PDict<Connection> tcp_conns;
+	PDict<Connection> udp_conns;
+	PDict<Connection> icmp_conns;
+	PDict<FragReassembler> fragments;
 
 	typedef pair<IPAddr, IPAddr> IPPair;
 	typedef pair<EncapsulatingConn, double> TunnelActivity;

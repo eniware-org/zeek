@@ -119,6 +119,69 @@ New Functionality
 	local p1 = paraglob_init(v1);
 	print paraglob_match(p1, "dog");
 
+- An ``expire_func`` for a table with a multi-value-index will now unroll
+  the index and take one argument for each index value. For example, for a
+  ``table[string,string] of count`` the expire function signature is:
+
+  function(t: table[string, string] of count, s: string, s2: string): interval
+
+- Zeek's anonymous functions now capture their closures by reference.
+  This means that they can use and modify variables from the scope
+  that they were generated in. For example:
+
+      local n = 3;
+      local f = function() { n += 1; };
+      f();
+      print n; # prints 4
+
+  These anonymous functions can also be serialized over Broker with
+  their closures. In order to be serialzed over Broker the receiving
+  script needs to have an identical version of the function declared.
+  For the above example, a receiving script would need to have
+  declared a function
+
+      local name = function() { n += 1; };
+
+  to be able to receive the senders function over Broker.
+
+  Functions with closures can still use the variables they have
+  captured even after they have left the scope that they were declared
+  in. For example, a simple generator function like the one below
+  works as expected.
+
+      local make_adder = function(n: count): function(m: count): count
+          {
+          return function (m: count): count
+              {
+              return n + m;
+              };
+          };
+
+      print make_adder(3)(5); # prints 8
+
+      local three = make_adder(3);
+      print three(5); # prints 8
+
+- Add ``LogAscii::enable_utf_8`` option to allow valid utf8 sequences
+  to be written directly into the ASCII logs without any escaping.
+
+- Add parsing, analysis, and logging support for MQTT protocol v3.1/v3.1.1.
+  This is not enabled by default, use ``@load policy/protocols/mqtt`` to
+  use the new MQTT analysis support.
+
+- Zeek now supports duration thresholding on connections, similarly to how it supports
+  byte and packet thresholds.
+
+  - New events:
+    - ConnThreshold::duration_threshold_crossed
+    - conn_duration_threshold_crossed
+
+  - New functions:
+    - ConnThreshold::set_duration_threshold
+    - ConnThreshold::delete_duration_threshold
+    - set_current_conn_duration_threshold
+    - get_current_conn_duration_threshold
+
 Changed Functionality
 ---------------------
 
@@ -206,9 +269,14 @@ Changed Functionality
   that didn't otherwise handle them (like syslog, modbus, dnp3) are now
   a ProtocolViolation instead
 
+- An "addl" parameter was added to the ``flow_weird`` and ``net_weird`` events
+  for describing additional information about the weird.  The ``conn_weird``
+  event already had such a parameter.
+
 - Weird names that contained variable content and may result in an unbounded
   number of weird names have been renamed to remove the variable content
-  (which has been made available in the "addl" field of conn_weirds):
+  (which has been made available in the "addl" field of ``conn_weird``,
+   ``flow_weird``, or ``net_weird`` events):
 
     - "unknown_dce_rpc_auth_type_%d" -> unknown_dce_rpc_auth_type
     - "gtp_invalid_info_element_%d" -> gtp_invalid_info_element
@@ -257,7 +325,7 @@ Changed Functionality
   used it to generate their own documentation via the ``--broxygen`` flag,
   which is now named ``--zeekygen``.  Besides that, the various documentation
   in scripts has also been updated to replace Sphinx cross-referencing roles
-  and directives like ":bro:see:" with ":zeek:zee:".
+  and directives like ":bro:see:" with ":zeek:see:".
 
 - The catch-and-release and unified2 scripts are no longer loaded by
   default.  Because there was a performance impact simply from loading
@@ -346,6 +414,47 @@ Changed Functionality
   notices of the same kind that are generated within a short timespan
   of each other on separate cluster nodes to all be logged rather
   than suppressed and de-duplicated into a single notice.
+
+
+- to_json is now a bif, no longer a script. Loading base/utils/json.zeek is no
+  longer necessary and has been deprecated. to_json should yield much better, always
+  valid json. There are some small differences in output; unnecessary spaces are removed
+  and port values are rendered differently, now including the port and the protocol.
+
+- The output of the JSON logger now uses an external library to generate json. There
+  are small changes to the output; most visibly double numbers are now rounded slightly
+  differently. The way in which port values are rendered does _not_ change for JSON logs.
+
+- The C++-layer List, Queue, and Dict types have changed from using macros to
+  templates as well as some other API changes.
+
+  - Range-based for-loops are now supported
+
+  - The loop_over_queue macro is now removed
+
+  - PList is now a template instead of a macro, so any "PList(T)" usages in
+    external code should now use "PList<T>"
+
+  - PDict is now a template instead of a macro, so any "PDict(T)" usages in
+    external code should now use "PDict<T>"
+
+  - Generally some methods used to assume containers were only using integer
+    or pointer types, so semantics may now be slightly different to
+    either avoid copying or unsafely returning arbitrary T types by value.
+    E.g. List::remove_nth and List::get can no longer return a "null" value
+    when the provided index is out of range, so they assert instead, and
+    Queue::pop methods do not return a value at all (one must check for
+    a non-empty container before removing an element).
+
+- Google Perftools (tcmalloc) is no longer used by default on Linux
+  systems if it's found during the configuration process.
+  Use the --enable-perftools configuration flag to use tcmalloc.
+  The --disable-perftools flag is also no longer provided since
+  there's no longer any case in which tcmalloc will be used by default.
+
+- There now is a maximum number of protocol violations that can be raised by an analyzer
+  before it is disabled; the default is set to 5. This behavior is customizable using
+  ``DPD::max_violations`` and ``DPD::ignore_violations``.
 
 Removed Functionality
 ---------------------
@@ -529,6 +638,8 @@ Removed Functionality
 
 - Removed the BackDoor analyzer.
 
+- Removed ``List::sortedinsert`` from the C++ API.
+
 Deprecated Functionality
 ------------------------
 
@@ -545,6 +656,9 @@ Deprecated Functionality
 
 - The ``bro_is_terminating`` and ``bro_version`` function are deprecated and
   replaced by functions named ``zeek_is_terminating`` and ``zeek_version``.
+
+- The ``List::insert`` method from the C++ API is deprecated, use
+  ``List::push_front`` instead.
 
 Bro 2.6
 =======

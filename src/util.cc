@@ -51,6 +51,7 @@
 #include "Net.h"
 #include "Reporter.h"
 #include "iosource/Manager.h"
+#include "ConvertUTF.h"
 
 /**
  * Return IP address without enclosing brackets and any leading 0x.  Also
@@ -1001,11 +1002,12 @@ string bro_prefixes()
 	{
 	string rval;
 
-	loop_over_list(prefixes, j)
-		if ( j == 0 )
-			rval.append(prefixes[j]);
-		else
-			rval.append(":").append(prefixes[j]);
+	for ( const auto& prefix : prefixes )
+		{
+		if ( ! rval.empty() )
+			rval.append(":");
+		rval.append(prefix);
+		}
 
 	return rval;
 	}
@@ -1842,24 +1844,24 @@ void bro_strerror_r(int bro_errno, char* buf, size_t buflen)
 	strerror_r_helper(res, buf, buflen);
 	}
 
+static const std::map<const char*, const char*, CompareString> legacy_vars = {
+	{ "ZEEKPATH", "BROPATH" },
+	{ "ZEEK_PLUGIN_PATH", "BRO_PLUGIN_PATH" },
+	{ "ZEEK_PLUGIN_ACTIVATE", "BRO_PLUGIN_ACTIVATE" },
+	{ "ZEEK_PREFIXES", "BRO_PREFIXES" },
+	{ "ZEEK_DNS_FAKE", "BRO_DNS_FAKE" },
+	{ "ZEEK_SEED_FILE", "BRO_SEED_FILE" },
+	{ "ZEEK_LOG_SUFFIX", "BRO_LOG_SUFFIX" },
+	{ "ZEEK_PROFILER_FILE", "BRO_PROFILER_FILE" },
+	{ "ZEEK_DISABLE_ZEEKYGEN", "BRO_DISABLE_BROXYGEN" },
+	{ "ZEEK_DEFAULT_CONNECT_RETRY", "BRO_DEFAULT_CONNECT_RETRY" },
+	{ "ZEEK_BROKER_MAX_THREADS", "BRO_BROKER_MAX_THREADS" },
+	{ "ZEEK_DEFAULT_LISTEN_ADDRESS", "BRO_DEFAULT_LISTEN_ADDRESS" },
+	{ "ZEEK_DEFAULT_LISTEN_RETRY", "BRO_DEFAULT_LISTEN_RETRY" },
+};
+
 char* zeekenv(const char* name)
 	{
-	static std::map<const char*, const char*, CompareString> legacy_vars = {
-		{ "ZEEKPATH", "BROPATH" },
-		{ "ZEEK_PLUGIN_PATH", "BRO_PLUGIN_PATH" },
-		{ "ZEEK_PLUGIN_ACTIVATE", "BRO_PLUGIN_ACTIVATE" },
-		{ "ZEEK_PREFIXES", "BRO_PREFIXES" },
-		{ "ZEEK_DNS_FAKE", "BRO_DNS_FAKE" },
-		{ "ZEEK_SEED_FILE", "BRO_SEED_FILE" },
-		{ "ZEEK_LOG_SUFFIX", "BRO_LOG_SUFFIX" },
-		{ "ZEEK_PROFILER_FILE", "BRO_PROFILER_FILE" },
-		{ "ZEEK_DISABLE_ZEEKYGEN", "BRO_DISABLE_BROXYGEN" },
-		{ "ZEEK_DEFAULT_CONNECT_RETRY", "BRO_DEFAULT_CONNECT_RETRY" },
-		{ "ZEEK_BROKER_MAX_THREADS", "BRO_BROKER_MAX_THREADS" },
-		{ "ZEEK_DEFAULT_LISTEN_ADDRESS", "BRO_DEFAULT_LISTEN_ADDRESS" },
-		{ "ZEEK_DEFAULT_LISTEN_RETRY", "BRO_DEFAULT_LISTEN_RETRY" },
-	};
-
 	auto rval = getenv(name);
 
 	if ( rval )
@@ -1871,4 +1873,65 @@ char* zeekenv(const char* name)
 		return rval;
 
 	return getenv(it->second);
+	}
+
+static string json_escape_byte(char c)
+	{
+	char hex[2] = {'0', '0'};
+	bytetohex(c, hex);
+
+	string result = "\\x";
+	result.append(hex, 2);
+
+	return result;
+	}
+
+string json_escape_utf8(const string& val)
+	{
+	string result;
+	result.reserve(val.length());
+
+	auto val_data = reinterpret_cast<const unsigned char*>(val.c_str());
+
+	size_t idx;
+	for ( idx = 0; idx < val.length(); )
+		{
+		// Normal ASCII characters plus a few of the control characters can be inserted directly. The rest of
+		// the control characters should be escaped as regular bytes.
+		if ( ( val[idx] >= 32 && val[idx] <= 127 ) ||
+		       val[idx] == '\b' || val[idx] == '\f' || val[idx] == '\n' || val[idx] == '\r' || val[idx] == '\t' )
+			{
+			result.push_back(val[idx]);
+			++idx;
+			continue;
+			}
+		else if ( val[idx] >= 0 && val[idx] < 32 )
+			{
+			result.append(json_escape_byte(val[idx]));
+			++idx;
+			continue;
+			}
+
+		// Find out how long the next character should be.
+		unsigned int char_size = getNumBytesForUTF8(val[idx]);
+
+		// If it says that it's a single character or it's not an invalid string UTF8 sequence, insert the one
+		// escaped byte into the string, step forward one, and go to the next character.
+		if ( char_size == 0 || idx+char_size > val.length() || isLegalUTF8Sequence(val_data+idx, val_data+idx+char_size) == 0 )
+			{
+			result.append(json_escape_byte(val[idx]));
+			++idx;
+			continue;
+			}
+
+		for ( size_t step = 0; step < char_size; step++, idx++ )
+			result.push_back(val[idx]);
+		}
+
+	// Insert any of the remaining bytes into the string as escaped bytes
+	if ( idx != val.length() )
+		for ( ; idx < val.length(); ++idx )
+			result.append(json_escape_byte(val[idx]));
+
+	return result;
 	}

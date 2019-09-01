@@ -82,7 +82,6 @@ public:
 	BroObj()
 		{
 		ref_cnt = 1;
-		in_ser_cache = false;
 		notify_plugins = false;
 
 		// A bit of a hack.  We'd like to associate location
@@ -156,8 +155,6 @@ public:
 		~SuppressErrors()	{ --BroObj::suppress_errors; }
 	};
 
-	bool in_ser_cache;
-
 protected:
 	Location* location;	// all that matters in real estate
 
@@ -194,7 +191,7 @@ inline void Error(const BroObj* o, const char* msg)
 
 inline void Ref(BroObj* o)
 	{
-	if ( ++o->ref_cnt <= 1 )
+	if ( ++(o->ref_cnt) <= 1 )
 		bad_ref(0);
 	if ( o->ref_cnt == INT_MAX )
 		bad_ref(1);

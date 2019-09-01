@@ -13,6 +13,9 @@
 #include "EventHandler.h"
 #include "TraverseTypes.h"
 
+#include <memory>
+#include <utility>
+
 typedef enum {
 	EXPR_ANY = -1,
 	EXPR_NAME, EXPR_CONST,
@@ -28,7 +31,6 @@ typedef enum {
 	EXPR_COND,
 	EXPR_REF,
 	EXPR_ASSIGN,
-	EXPR_MATCH,
 	EXPR_INDEX,
 	EXPR_FIELD, EXPR_HAS_FIELD,
 	EXPR_RECORD_CONSTRUCTOR,
@@ -39,6 +41,7 @@ typedef enum {
 	EXPR_IN,
 	EXPR_LIST,
 	EXPR_CALL,
+	EXPR_LAMBDA,
 	EXPR_EVENT,
 	EXPR_SCHEDULE,
 	EXPR_ARITH_COERCE,
@@ -63,6 +66,8 @@ class IndexExpr;
 class AssignExpr;
 class CallExpr;
 class EventExpr;
+
+struct function_ingredients;
 
 
 class Expr : public BroObj {
@@ -943,6 +948,30 @@ protected:
 
 	Expr* func;
 	ListExpr* args;
+};
+
+
+/**
+ * Class that represents an anonymous function expression in Zeek.
+ * On evaluation, captures the frame that it is evaluated in. This becomes
+ * the closure for the instance of the function that it creates.
+ */
+class LambdaExpr : public Expr {
+public:
+	LambdaExpr(std::unique_ptr<function_ingredients> ingredients,
+		   id_list outer_ids);
+
+	Val* Eval(Frame* f) const override;
+	TraversalCode Traverse(TraversalCallback* cb) const override;
+
+protected:
+	void ExprDescribe(ODesc* d) const override;
+
+private:
+	std::unique_ptr<function_ingredients> ingredients;
+
+	id_list outer_ids;
+	std::string my_name;
 };
 
 class EventExpr : public Expr {

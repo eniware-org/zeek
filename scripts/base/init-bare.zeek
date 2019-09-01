@@ -96,6 +96,13 @@ type table_string_of_count: table[string] of count;
 ##    directly and then remove this alias.
 type files_tag_set: set[Files::Tag];
 
+## A set of intervals.
+##
+## .. todo:: We need this type definition only for declaring builtin functions
+##    via ``bifcl``. We should extend ``bifcl`` to understand composite types
+##    directly and then remove this alias.
+type interval_set: set[interval];
+
 ## A structure indicating a MIME type and strength of a match against
 ## file magic signatures.
 ##
@@ -3289,6 +3296,42 @@ export {
 		create_action : count;
 	};
 
+	## A series of integers flags used to set quota and content indexing control information for a file system volume in SMB2.
+	##
+	## For more information, see MS-SMB2:2.2.39 and MS-FSCC:2.5.2
+	##
+	type SMB2::Fscontrol: record {
+		## minimum amount of free disk space required to begin document filtering
+		free_space_start_filtering : int;
+		## minimum amount of free disk space required to continue document filtering
+		free_space_threshold       : int;
+		## minimum amount of free disk space required to continue document filtering
+		free_space_threshold       : int;
+		## default per-user disk quota
+		delete_quota_threshold     : count;
+		## default per-user disk limit
+		default_quota_limit        : count;
+		## file systems control flags passed as unsigned int
+		fs_control_flags           : count;
+	};
+
+	## This information class is used to query or set extended attribute (EA) information for a file.
+	##
+	## For more infomation, see MS-SMB2:2.2.39 and MS-FSCC:2.4.15
+	##
+	type SMB2::FileEA: record {
+		## Specifies the extended attribute name
+		ea_name  : string;
+		## Contains the extended attribute value
+		ea_value : string;
+	};
+
+	## A vector of extended attribute (EA) information for a file.
+	##
+	## For more infomation, see MS-SMB2:2.2.39 and MS-FSCC:2.4.15
+	##
+	type SMB2::FileEAs: vector of SMB2::FileEA;
+
 	## An SMB2 transform header (for SMB 3.x dialects with encryption enabled).
 	##
 	## For more information, see MS-SMB2:2.2.41
@@ -4976,6 +5019,81 @@ export {
 		## monitoring, statistics gathering and configuration.
 		mode7_msg: NTP::Mode7Message &optional;
 	};
+}
+
+module MQTT;
+export {
+	type MQTT::ConnectMsg: record {
+		## Protocol name
+		protocol_name    : string;
+		## Protocol version
+		protocol_version : count;
+
+		## Identifies the Client to the Server.
+		client_id        : string;
+		## The maximum time interval that is permitted to elapse between the
+		## point at which the Client finishes transmitting one Control Packet
+		## and the point it starts sending the next.
+		keep_alive       : interval;
+
+		## The clean_session flag indicates if the server should or shouldn't
+		## use a clean session or use existing previous session state.
+		clean_session    : bool;
+
+		## Specifies if the Will Message is to be retained when it is published.
+		will_retain      : bool;
+		## Specifies the QoS level to be used when publishing the Will Message.
+		will_qos         : count;
+		## Topic to publish the Will message to.
+		will_topic       : string &optional;
+		## The actual Will message to publish.
+		will_msg         : string &optional;
+
+		## Username to use for authentication to the server.
+		username         : string &optional;
+		## Pass to use for authentication to the server.
+		password         : string &optional;
+	};
+
+	type MQTT::ConnectAckMsg: record {
+		## Return code from the connack message
+		return_code: count;
+
+		## The Session present flag helps the client
+		## establish whether the Client and Server
+		## have a consistent view about whether there
+		## is already stored Session state.
+		session_present: bool;
+	};
+
+	type MQTT::PublishMsg: record {
+		## Indicates if this is the first attempt at publishing the message.
+		dup     : bool;
+
+		## Indicates what level of QoS is enabled for this message.
+		qos     : count;
+
+		## Indicates if the server should retain this message so that clients
+		## subscribing to the topic in the future will receive this message
+		## automatically.
+		retain  : bool;
+
+		## Name of the topic the published message is directed into.
+		topic   : string;
+
+		## Payload of the published message.
+		payload : string;
+
+		## The actual length of the payload in the case the *payload*
+		## field's contents were truncated according to
+		## :zeek:see:`MQTT::max_payload_size`.
+		payload_len : count;
+	};
+
+	## The maximum payload size to allocate for the purpose of
+	## payload information in :zeek:see:`mqtt_publish` events (and the
+	## default MQTT logs generated from that).
+	option max_payload_size = 100;
 }
 
 module Cluster;

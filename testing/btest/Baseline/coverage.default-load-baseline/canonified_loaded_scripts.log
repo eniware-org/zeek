@@ -3,7 +3,7 @@
 #empty_field	(empty)
 #unset_field	-
 #path	loaded_scripts
-#open	2019-06-15-20-54-48
+#open	2019-08-06-00-02-39
 #fields	name
 #types	string
 scripts/base/init-bare.zeek
@@ -90,6 +90,8 @@ scripts/base/init-frameworks-and-bifs.zeek
     build/scripts/base/bif/plugins/Zeek_Login.functions.bif.zeek
     build/scripts/base/bif/plugins/Zeek_MIME.events.bif.zeek
     build/scripts/base/bif/plugins/Zeek_Modbus.events.bif.zeek
+    build/scripts/base/bif/plugins/Zeek_MQTT.types.bif.zeek
+    build/scripts/base/bif/plugins/Zeek_MQTT.events.bif.zeek
     build/scripts/base/bif/plugins/Zeek_MySQL.events.bif.zeek
     build/scripts/base/bif/plugins/Zeek_NCP.events.bif.zeek
     build/scripts/base/bif/plugins/Zeek_NCP.consts.bif.zeek
@@ -249,7 +251,6 @@ scripts/base/init-default.zeek
     scripts/base/frameworks/openflow/main.zeek
     scripts/base/frameworks/openflow/plugins/__load__.zeek
       scripts/base/frameworks/openflow/plugins/ryu.zeek
-        scripts/base/utils/json.zeek
       scripts/base/frameworks/openflow/plugins/log.zeek
       scripts/base/frameworks/openflow/plugins/broker.zeek
     scripts/base/frameworks/openflow/non-cluster.zeek
@@ -319,6 +320,8 @@ scripts/base/init-default.zeek
   scripts/base/protocols/modbus/__load__.zeek
     scripts/base/protocols/modbus/consts.zeek
     scripts/base/protocols/modbus/main.zeek
+  scripts/base/protocols/mqtt/__load__.zeek
+    scripts/base/protocols/mqtt/consts.zeek
   scripts/base/protocols/mysql/__load__.zeek
     scripts/base/protocols/mysql/main.zeek
       scripts/base/protocols/mysql/consts.zeek
@@ -372,4 +375,4 @@ scripts/base/init-default.zeek
   scripts/base/misc/find-filtered-trace.zeek
   scripts/base/misc/version.zeek
 scripts/policy/misc/loaded-scripts.zeek
-#close	2019-06-15-20-54-48
+#close	2019-08-06-00-02-39

@@ -164,11 +164,8 @@ static type_decl_list* copy_type_decl_list(type_decl_list* tdl)
 
 	type_decl_list* rval = new type_decl_list();
 
-	loop_over_list(*tdl, i)
-		{
-		TypeDecl* td = (*tdl)[i];
-		rval->append(new TypeDecl(*td));
-		}
+	for ( const auto& td : *tdl )
+		rval->push_back(new TypeDecl(*td));
 
 	return rval;
 	}
@@ -180,11 +177,10 @@ static attr_list* copy_attr_list(attr_list* al)
 
 	attr_list* rval = new attr_list();
 
-	loop_over_list(*al, i)
+	for ( const auto& a : *al )
 		{
-		Attr* a = (*al)[i];
 		::Ref(a);
-		rval->append(a);
+		rval->push_back(a);
 		}
 
 	return rval;
@@ -268,11 +264,11 @@ bro:
 		decl_list stmt_list
 			{
 			if ( stmts )
-				stmts->AsStmtList()->Stmts().append($2);
+				stmts->AsStmtList()->Stmts().push_back($2);
 			else
 				stmts = $2;
 
-			// Any objects creates from hereon out should not
+			// Any objects creates from here on out should not
 			// have file positions associated with them.
 			set_location(no_location);
 			}
@@ -649,6 +645,7 @@ expr:
 
 	|	anonymous_function
 
+
 	|	TOK_SCHEDULE expr '{' event '}'
 			{
 			set_location(@1, @5);
@@ -994,7 +991,7 @@ type:
 				{
 				NullStmt here;
 				if ( $1 )
-					$1->Error("not a Bro type", &here);
+					$1->Error("not a Zeek type", &here);
 				$$ = error_type();
 				}
 			else
@@ -1020,7 +1017,7 @@ type_list:
 type_decl_list:
 		type_decl_list type_decl
 			{
-			$1->append($2);
+			$1->push_back($2);
 			}
 	|
 			{
@@ -1050,11 +1047,11 @@ formal_args:
 
 formal_args_decl_list:
 		formal_args_decl_list ';' formal_args_decl
-			{ $1->append($3); }
+			{ $1->push_back($3); }
 	|	formal_args_decl_list ',' formal_args_decl
-			{ $1->append($3); }
+			{ $1->push_back($3); }
 	|	formal_args_decl
-			{ $$ = new type_decl_list(); $$->append($1); }
+			{ $$ = new type_decl_list(); $$->push_back($1); }
 	;
 
 formal_args_decl:
@@ -1216,16 +1213,39 @@ func_body:
 	;
 
 anonymous_function:
-		TOK_FUNCTION begin_func func_body
-			{ $$ = new ConstExpr($2->ID_Val()); }
+		TOK_FUNCTION begin_func
+
+		'{'
+			{
+			saved_in_init.push_back(in_init);
+			in_init = 0;
+			}
+
+		stmt_list
+			{
+			in_init = saved_in_init.back();
+			saved_in_init.pop_back();
+			}
+
+		'}'
+			{
+			// Code duplication here is sad but needed. end_func actually instantiates the function
+			// and associates it with an ID. We perform that association later and need to return
+			// a lambda expression.
+
+			// Gather the ingredients for a BroFunc from the current scope
+			std::unique_ptr<function_ingredients> ingredients = gather_function_ingredients(current_scope(), $5);
+			id_list outer_ids = gather_outer_ids(pop_scope(), $5);
+
+			$$ = new LambdaExpr(std::move(ingredients), std::move(outer_ids));
+			}
 	;
 
 begin_func:
 		func_params
 			{
 			$$ = current_scope()->GenerateTemporary("anonymous-function");
-			begin_func($$, current_module.c_str(),
-				   FUNC_FLAVOR_FUNCTION, 0, $1);
+			begin_func($$, current_module.c_str(), FUNC_FLAVOR_FUNCTION, 0, $1);
 			}
 	;
 
@@ -1288,17 +1308,17 @@ opt_attr:
 
 attr_list:
 		attr_list attr
-			{ $1->append($2); }
+			{ $1->push_back($2); }
 	|	attr
 			{
 			$$ = new attr_list;
-			$$->append($1);
+			$$->push_back($1);
 			}
 	;
 
 attr:
 		TOK_ATTR_DEFAULT '=' expr
-			{ $$ = new Attr(ATTR_DEFAULT, $3); }
+		        { $$ = new Attr(ATTR_DEFAULT, $3); }
 	|	TOK_ATTR_OPTIONAL
 			{ $$ = new Attr(ATTR_OPTIONAL); }
 	|	TOK_ATTR_REDEF
@@ -1527,7 +1547,7 @@ stmt_list:
 		stmt_list stmt
 			{
 			set_location(@1, @2);
-			$1->AsStmtList()->Stmts().append($2);
+			$1->AsStmtList()->Stmts().push_back($2);
 			$1->UpdateLocationEndInfo(@2);
 			}
 	|
@@ -1557,7 +1577,7 @@ event:
 
 case_list:
 		case_list case
-			{ $1->append($2); }
+			{ $1->push_back($2); }
 	|
 			{ $$ = new case_list; }
 	;
@@ -1575,12 +1595,12 @@ case:
 
 case_type_list:
 		case_type_list ',' case_type
-			{ $1->append($3); }
+			{ $1->push_back($3); }
 	|
 		case_type
 			{
 			$$ = new id_list;
-			$$->append($1);
+			$$->push_back($1);
 			}
 	;
 
@@ -1628,7 +1648,7 @@ for_head:
 						      false, false);
 
 			id_list* loop_vars = new id_list;
-			loop_vars->append(loop_var);
+			loop_vars->push_back(loop_var);
 
 			$$ = new ForStmt(loop_vars, $5);
 			}
@@ -1666,7 +1686,7 @@ for_head:
 				val_var = install_ID($5, module, false, false);
 
 			id_list* loop_vars = new id_list;
-			loop_vars->append(key_var);
+			loop_vars->push_back(key_var);
 
 			$$ = new ForStmt(loop_vars, $7, val_var);
 			}
@@ -1693,11 +1713,11 @@ for_head:
 
 local_id_list:
 		local_id_list ',' local_id
-			{ $1->append($3); }
+			{ $1->push_back($3); }
 	|	local_id
 			{
 			$$ = new id_list;
-			$$->append($1);
+			$$->push_back($1);
 			}
 	;
 

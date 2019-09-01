@@ -195,11 +195,11 @@ void Manager::InitPostScript()
 		config.set("scheduler.max-threads",
 		           get_option("Broker::max_threads")->AsCount());
 
-	config.set("work-stealing.moderate-sleep-duration-us",
-	    static_cast<unsigned>(get_option("Broker::moderate_sleep")->AsInterval() / Microseconds));
+	config.set("work-stealing.moderate-sleep-duration", caf::timespan(
+	    static_cast<unsigned>(get_option("Broker::moderate_sleep")->AsInterval() * 1e9)));
 
-	config.set("work-stealing.relaxed-sleep-duration-us",
-	    static_cast<unsigned>(get_option("Broker::relaxed_sleep")->AsInterval() / Microseconds));
+	config.set("work-stealing.relaxed-sleep-duration", caf::timespan(
+	    static_cast<unsigned>(get_option("Broker::relaxed_sleep")->AsInterval() * 1e9)));
 
 	config.set("work-stealing.aggressive-poll-attempts",
 	           get_option("Broker::aggressive_polls")->AsCount());
@@ -1039,13 +1039,23 @@ void Manager::ProcessEvent(const broker::topic& topic, broker::zeek::Event ev)
 		auto val = data_to_val(std::move(args[i]), expected_type);
 
 		if ( val )
-			vl.append(val);
+			vl.push_back(val);
 		else
 			{
+			auto expected_name = type_name(expected_type->Tag());
+
 			reporter->Warning("failed to convert remote event '%s' arg #%d,"
-			                  " got %s, expected %s",
-			                  name.data(), i, got_type,
-			                  type_name(expected_type->Tag()));
+					  " got %s, expected %s",
+					  name.data(), i, got_type,
+					  expected_name);
+
+			// If we got a vector and expected a function this is
+			// possibly because of a mismatch between
+			// anonymous-function bodies.
+			if ( strcmp(expected_name, "func") == 0 && strcmp("vector", got_type) == 0 )
+				reporter->Warning("when sending functions the receiver must have access to a"
+						  " version of that function.\nFor anonymous functions, that function must have the same body.");
+
 			break;
 			}
 		}
@@ -1054,8 +1064,8 @@ void Manager::ProcessEvent(const broker::topic& topic, broker::zeek::Event ev)
 		mgr.QueueEventFast(handler, std::move(vl), SOURCE_BROKER);
 	else
 		{
-		loop_over_list(vl, i)
-			Unref(vl[i]);
+		for ( const auto& v : vl )
+			Unref(v);
 		}
 	}
 

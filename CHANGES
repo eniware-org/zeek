@@ -1,4 +1,377 @@
 
+3.0.0-rc2 | 2019-08-28 16:39:50 -0700
+
+  * Release 3.0.0-rc2 (Jon Siwek, Corelight)
+
+3.0.0-rc1.8 | 2019-08-28 15:25:08 -0700
+
+  * GH-545: add "addl" parameter to flow_weird and net_weird events (Jon Siwek, Corelight)
+
+  * GH-541: add test cases for NTLM AV Pair sequence handling (Jon Siwek, Corelight)
+
+  * GH-541: fix handling of NTLM AV Pair sequences (Jon Siwek, Corelight)
+
+    Empty AV Pair sequences or AV Pair sequences that lack a terminator
+    could cause accesses past the end of the parsed vector.
+
+  * GH-554: remove use of file magic in protocol-based signature logic (Jon Siwek, Corelight)
+
+    This can be a significant performance/memory improvement since
+    otherwise the protocol-based rule matching logic ends up superfluously
+    creating file-matching state per file-matcher per connection/endpoint.
+
+3.0.0-rc1.3 | 2019-08-27 10:25:44 -0700
+
+  * Fix parsing of smb3 negotiate context (Pavel Ershov)
+
+3.0.0-rc1.1 | 2019-08-13 23:16:55 +0000
+
+  * GH-533: Use consistent "lib" install dir. (Jon Siwek, Corelight)
+
+3.0.0-rc1 | 2019-08-08 11:15:35 -0700
+
+  * Release 3.0.0-rc1
+
+  * Update local.zeek compatibility test (Jon Siwek, Corelight)
+
+2.6-767 | 2019-08-07 12:27:21 -0700
+
+  * Add memory leak test of closure (un)serialization (Jon Siwek, Corelight)
+
+2.6-765 | 2019-08-07 08:05:35 -0700
+
+  * GH-527: fix parsing of MQTT Remaining Length field
+
+    Packet length is encoded in up to four bytes, with MSB (0x80)
+    indicating if there's more bytes in the representation still to follow.
+    The comparison/bitwise-mask wasn't correctly testing the MSB.
+
+    Coverity CID 1403964 (Jon Siwek, Corelight)
+
+  * GH-527: fix LambdaExpr::Traverse
+
+    Coverity CID 1403966 (Jon Siwek, Corelight)
+
+  * GH-527: fix ref-counting issues in Frame unserialization
+
+    Coverity CIDs 1403968, 1403967 (Jon Siwek, Corelight)
+
+2.6-760 | 2019-08-05 21:01:16 -0700
+
+  * GH-474: change MQTT::max_payload_size to be a runtime option (Jon Siwek, Corelight)
+
+2.6-758 | 2019-08-05 18:59:53 -0700
+
+  * Fix malformed SMB documentation (Jon Siwek, Corelight)
+
+  * Fix documentation warnings for MQTT identifiers (Jon Siwek, Corelight)
+
+2.6-756 | 2019-08-05 17:32:33 -0700
+
+  * Disable MQTT by default (Johanna Amann, Corelight)
+
+    To enable MQTT, one has to load policy/scripts/mqtt. Like with smb in
+    2.5, the consts are loaded by default.
+
+2.6-754 | 2019-08-05 10:12:51 -0700
+
+  * GH-474: add MQTT::max_payload_size option
+
+    This caps size of payload strings within mqtt_publish events and
+    mqtt_publish.log files.  A new "payload_len" field in the log file
+    shows the real payload size in cases where it may have been truncated. (Jon Siwek, Corelight)
+
+  * GH-474: use topic vectors for MQTT (un)subscribe events/logs (Jon Siwek, Corelight)
+
+  * Update Certificate Transparency list (Johanna Amann)
+
+  * Update CA store to NSS 3.45 (Johanna Amann)
+
+2.6-748 | 2019-08-02 11:55:46 -0700
+
+  * GH-517: fix MQTT suback/unsuback accessing non-existent index (Jon Siwek, Corelight)
+
+2.6-747 | 2019-08-02 11:30:52 -0700
+
+  * Fix how Broker/CAF sleep duration options are set (Jon Siwek, Corelight)
+
+  * Add duration thresholding to the conn-size analyzer. (Johanna Amann, Corelight)
+
+    Now, in addition to setting thresholds for bytes and packet, one can set
+    a threshold for connection duration. Note that the threshold event is
+    only raised once the next packet in the connection is seen.
+
+    This also fixes a small pre-existing bug, in which a bunch of warnings
+    were raised if someone just used the lower-level functions without going
+    through the higher-level scripting API.
+
+2.6-744 | 2019-08-01 13:33:12 -0700
+
+  * Guarantee unique internal name for each lambda function
+    By dealing with hash collisions. (Jon Siwek, Corelight)
+
+  * Use consistent hashing method for internal lambda function names
+
+    The results of std::hash<std::string> may vary depending on platform.
+    E.g. test suite failed on macOS due to Linux generating different lambda
+    function names. (Jon Siwek, Corelight)
+
+  * Improve error messages from to_addr and to_subnet BIFs. (Jon Siwek, Corelight)
+
+2.6-739 | 2019-08-01 12:28:25 -0700
+
+  * Fix a test that used a hardcoded Broker port (Jon Siwek, Corelight)
+
+2.6-737 | 2019-08-01 11:22:57 -0700
+
+  * GH-512: add --mandir configure option (Jon Siwek, Corelight)
+
+2.6-735 | 2019-07-31 21:29:58 -0700
+
+  * Fix the link to "good first issue" tickets. (Seth Hall, Corelight)
+
+2.6-733 | 2019-07-31 21:23:37 -0700
+
+  * Add MQTT analyzer, updated/ported from original version by Supriya Kumar (Seth Hall, Corelight)
+
+    This analyzer generates three logs to fully display what is happening over the MQTT connection.
+      - mqtt_connect.log
+      - mqtt_subscribe.log
+      - mqtt_publish.log
+
+    At this time it only supports MQTT 3.1 and 3.1.1
+
+2.6-729 | 2019-07-31 14:24:44 -0700
+
+  * Rename a broxygen unit test to zeekygen (Jon Siwek, Corelight)
+
+2.6-728 | 2019-07-31 14:15:29 -0700
+
+  * Fix hello world script in READMEs (Seth Hall, Corelight & Jon Siwek, Corelight)
+
+  * Fixes a tiny Bro->Zeek renaming issue (Seth Hall, Corelight)
+
+2.6-725 | 2019-07-31 10:44:05 -0700
+
+  * GH-506: fix NTP script errors (Seth Hall, Corelight)
+
+2.6-723 | 2019-07-30 19:36:56 -0700
+
+  * Add LogAscii::enable_utf_8 option (Dev Bali, Corelight)
+
+    This option allows valid utf8 sequences to be written directly
+    into the ASCII logs without any escaping.
+
+2.6-713 | 2019-07-30 18:12:49 +0000
+
+  * Fix memory leaks in expire_func introduced by recent changes (Jon
+    Siwek, Corelight)
+
+2.6-711 | 2019-07-29 20:15:27 -0700
+
+  * Fix duplicate TCP packets not being detected as retransmissions (Jeff Barber)
+
+2.6-708 | 2019-07-30 02:46:39 +0000
+
+  * Add an additional license file, COPYING.3rdparty, that collects
+    all third party software licenses. (Johanna Amann, Corelight)
+
+2.6-706 | 2019-07-30 02:30:44 +0000
+
+  * Zeek's anonymous functions now capture their closures by
+    reference. This means that they can use and modify variables from
+    the scope that they were generated in. For example:
+
+        local n = 3;
+        local f = function() { n += 1; };
+        f();
+        print n; # prints 4
+
+    See NEWS and the documentations for more details. (Zeke Medley, Corelight)
+
+2.6-674 | 2019-07-29 16:11:42 -0400
+
+  * added more options to SMB2 set-info command (Mauro Palumbo)
+
+2.6-664 | 2019-07-29 10:01:12 -0700
+
+  * Add release branches to Travis CI whitelist (Jon Siwek, Corelight)
+
+  * GH-488: teach the Version module to parse new version scheme
+
+    Such as the new -rc format for release candidates (replacing "beta") and
+    -dev.X for development versions in the master branch. (Jon Siwek, Corelight)
+
+  * Improve type inference for vector-of-enum constructor (Jon Siwek, Corelight)
+
+  * GHI-486: Switch over to using LLVM utf8-checking code to better validate characters (Tim Wojtulewicz, Corelight)
+
+  * Fix undefined behavior via casting file analyzers to protocol analyzers
+
+    When generating some events for PE and X509 file analyzers, there's
+    an invalid cast from file_analysis::Analyzer to analyzer::Analyzer
+    and subsequent invalid member access via analyzer::Analyzer::GetID()
+    called on what is really a pointer to a file analyzer. (Jon Siwek, Corelight)
+
+  * Fix undefined behavior via hrw_weight BIF signed int overflow (Jon Siwek, Corelight)
+
+  * Fix undefined behavior via invalid TCP analyzer cast
+
+    A connection's root analyzer isn't necessarily TCP and an unchecked
+    C-style cast is undefined behavior in those cases. (Jon Siwek, Corelight)
+
+  * GH-485: fix cases where DHCP log omits MAC field
+
+    The field is populated in this order of preference:
+
+      (1) Use a client-identifier option sent by client
+      (2) Use the server's CHADDR field
+      (3) Use the client's CHADDR field
+
+    Case (3) did not exist before this patch. (Jon Siwek, Corelight)
+
+2.6-649 | 2019-07-23 09:37:05 -0700
+
+  * Remove --disable-perftools from coverity builds (Jon Siwek, Corelight)
+
+2.6-647 | 2019-07-22 12:46:04 -0700
+
+  * Ignore abs-path in test. (Zeke Medley, Corelight)
+
+  * Report argument # type check failed on. (Zeke Medley, Corelight)
+
+  * Update test baseline. (Zeke Medley, Corelight)
+
+  * Improve func arg type checking. (Zeke Medley, Corelight)
+
+  * &expire_func(table, arg1, arg2, ...) + type checking. (Zeke Medley, Corelight)
+
+2.6-640 | 2019-07-22 12:22:08 -0700
+
+  * Mark List::insert deprecated in favor of push_front (Tim Wojtulewicz, Corelight)
+
+  * Mark List::sort as deprecated, remove List::sortedinsert (Tim Wojtulewicz, Corelight)
+
+  * Simplify container iterators to just use pointers directly (Tim Wojtulewicz, Corelight)
+
+2.6-635 | 2019-07-22 10:58:56 -0700
+
+  * Add DPD::max_violations option
+
+    This allows one to tune the number of protocol violations to tolerate
+    from any given analyzer type before just disabling a given instance
+    of it.
+
+    Also removes the "disabled_aids" field from the DPD::Info record
+    since it serves no purpose: in this case, calling disable_analyzer
+    multiple times for the same analyzer is a no-op. (Jon Siwek, Corelight)
+
+  * Abort when --enable-jemalloc is given, but JeMalloc is not found
+    (Johanna Amann, Corelight)
+
+  * GH-475: Require --enable-perftools to link in tcmalloc. (Jon Siwek, Corelight)
+
+2.6-630 | 2019-07-19 18:01:44 -0700
+
+  * Fix typo in NEWS (Jon Siwek, Corelight)
+
+2.6-628 | 2019-07-19 15:48:58 +0000
+
+  * Support old plugins that may still reference "bro-config.h",
+    "bro-path-dev", or "bro" inside the build tree through
+    compatibility symlinks/wrappers. (Jon Siwek, Corelight)
+
+2.6-626 | 2019-07-18 19:44:31 -0700
+
+  * Remove unused expression type tag: EXPR_MATCH (Jon Siwek, Corelight)
+
+  * Add missing expr_name: vector_coerce (Jon Siwek, Corelight)
+
+2.6-624 | 2019-07-16 16:07:59 +0000
+
+  * Redo README. We now have separate plain text and Markdown versions.
+    (Zeke Medley, Corelight)
+
+2.6-616 | 2019-07-16 15:21:37 +0000
+
+  * Fix referecne counting bug in EnumType copy constructor. (Jon
+    Siwek, Corelight)
+
+  * Remove unused BroObj::in_ser_cache member. (Jon Siwek, Corelight)
+
+2.6-612 | 2019-07-15 19:46:04 -0700
+
+  * Fix a potential usage of List::remove_nth(-1) (Jon Siwek, Corelight)
+
+  * Change List::remote(const T&) to return a bool (Jon Siwek, Corelight)
+
+    It now indicates whether the removal took place or not, depending
+    on whether a matching element was found in the list.
+
+  * Fix debug build due to old int_list usage within assert (Jon Siwek, Corelight)
+
+  * Convert uses of loop_over_list to ranged-for loops (Tim Wojtulewicz, Corelight)
+
+  * Remove loop_over_queue (as an example for later removing loop_over_list) (Tim Wojtulewicz, Corelight)
+
+  * Change int_list in CCL.h to be a vector, fix uses of int_list to match (Tim Wojtulewicz, Corelight)
+
+  * Remove List<> usage from strings.bif (Tim Wojtulewicz, Corelight)
+
+  * Replace uses of the old Queue/PQueue generation code with new template versions (Tim Wojtulewicz, Corelight)
+
+  * Convert BaseQueue/Queue/PQueue into templates, including iterator support (Tim Wojtulewicz, Corelight)
+
+  * Replace uses of the old Dict generation code with new template versions (Tim Wojtulewicz, Corelight)
+
+  * Convert PDict into template (Tim Wojtulewicz, Corelight)
+
+  * Replace uses of the old List generation code with new template versions (Tim Wojtulewicz, Corelight)
+
+  * Convert BaseList/List/PList into templates, including iterator support (Tim Wojtulewicz, Corelight)
+
+2.6-598 | 2019-07-12 18:20:12 -0700
+
+  * Fix canonification of timestamps with a decisecond multiple (Jon Siwek, Corelight)
+
+2.6-597 | 2019-07-12 15:01:56 -0700
+
+  * Fix a couple of resource leaks from JSON changes (Tim Wojtulewicz, Corelight)
+
+2.6-595 | 2019-07-12 13:34:08 -0700
+
+  * GH-157: Mark some attributes as not allowed for global variables (Tim Wojtulewicz, Corelight)
+
+    This disallows &default for global values that are not tables, and &optional for all globals.
+
+  * Fix uncaught exceptions from Val cloning failures (Jon Siwek, Corelight)
+
+2.6-591 | 2019-07-11 13:29:28 -0700
+
+  * Fix potential thread safety issue with zeekenv util function
+
+    Observed segfault accessing the local static std::map of zeekenv() from
+    a logging thread, but only in non-debug builds using Apple/Clang
+    compiler, not in a debug build or GCC.  Don't quite get this behavior
+    since static local variable initialization is supposed to be thread-safe
+    since C++11, but moving to a global static works and is "more efficient"
+    anyway since there's no longer any run-time overhead. (Jon Siwek, Corelight)
+
+2.6-589 | 2019-07-11 13:14:52 -0700
+
+  * GH-421: fix bugs/regressions in DNP3 analyzer (Hui Lin)
+
+2.6-587 | 2019-07-11 12:13:48 -0700
+
+  * Fix a sign-compare compiler warning (Jon Siwek, Corelight)
+
+2.6-586 | 2019-07-11 11:15:40 -0700
+
+  * Convert all JSON output to use an external library for better consistency (Tim Wojtulewicz, Corelight)
+
+    See NEWS for more details; this makes to_json a bif and causes slight changes in its
+    output, as well as the output of the JSON logger.
+
 2.6-576 | 2019-07-10 18:38:54 -0700
 
   * Remove unused option: chunked_io_buffer_soft_cap (Jon Siwek, Corelight)
